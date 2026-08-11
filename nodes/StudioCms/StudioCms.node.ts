@@ -4,7 +4,14 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+
+import { STUDIOCMS_CONNECTION_TEST_PATH } from './transport/constants';
+import { studioCmsCollectionRequest } from './transport/request';
+
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : 'The StudioCMS operation failed';
+}
 
 export class StudioCms implements INodeType {
 	description: INodeTypeDescription = {
@@ -16,7 +23,7 @@ export class StudioCms implements INodeType {
 		},
 		group: ['transform'],
 		version: 1,
-		subtitle: 'StudioCMS REST API',
+		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description: 'Work with the StudioCMS REST API',
 		defaults: {
 			name: 'StudioCMS',
@@ -24,10 +31,79 @@ export class StudioCms implements INodeType {
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		usableAsTool: true,
-		properties: [],
+		credentials: [
+			{
+				name: 'studioCmsApi',
+				required: true,
+			},
+		],
+		properties: [
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Connection',
+						value: 'connection',
+					},
+				],
+				default: 'connection',
+			},
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['connection'] } },
+				options: [
+					{
+						name: 'Check',
+						value: 'check',
+						action: 'Check the connection',
+						description:
+							'Confirm that the StudioCMS site, REST API, and API token are available',
+					},
+				],
+				default: 'check',
+			},
+		],
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
-		return [this.getInputData()];
+		const inputs = this.getInputData();
+		const outputs: INodeExecutionData[] = [];
+
+		for (let itemIndex = 0; itemIndex < inputs.length; itemIndex++) {
+			try {
+				const resource = this.getNodeParameter('resource', itemIndex, 'connection');
+				const operation = this.getNodeParameter('operation', itemIndex, 'check');
+				if (resource !== 'connection' || operation !== 'check') {
+					throw new NodeOperationError(this.getNode(), 'Unsupported StudioCMS operation', {
+						itemIndex,
+					});
+				}
+
+				await studioCmsCollectionRequest.call(this, {
+					method: 'GET',
+					path: STUDIOCMS_CONNECTION_TEST_PATH,
+					itemIndex,
+				});
+				outputs.push({ json: { connected: true }, pairedItem: { item: itemIndex } });
+			} catch (error) {
+				if (!this.continueOnFail()) {
+					throw error instanceof NodeApiError || error instanceof NodeOperationError
+						? error
+						: new NodeOperationError(this.getNode(), errorMessage(error), { itemIndex });
+				}
+				outputs.push({
+					json: { error: errorMessage(error) },
+					pairedItem: { item: itemIndex },
+				});
+			}
+		}
+
+		return [outputs];
 	}
 }
