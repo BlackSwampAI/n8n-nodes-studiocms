@@ -6,6 +6,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
+import { categoryFields, categoryOperations, executeCategory } from './resources/category';
 import { STUDIOCMS_CONNECTION_TEST_PATH } from './transport/constants';
 import { studioCmsCollectionRequest } from './transport/request';
 
@@ -45,6 +46,10 @@ export class StudioCms implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
+						name: 'Category',
+						value: 'category',
+					},
+					{
 						name: 'Connection',
 						value: 'connection',
 					},
@@ -68,6 +73,8 @@ export class StudioCms implements INodeType {
 				],
 				default: 'check',
 			},
+			...categoryOperations,
+			...categoryFields,
 		],
 	};
 
@@ -79,6 +86,13 @@ export class StudioCms implements INodeType {
 			try {
 				const resource = this.getNodeParameter('resource', itemIndex, 'connection');
 				const operation = this.getNodeParameter('operation', itemIndex, 'check');
+				if (resource === 'category') {
+					const results = await executeCategory(this, operation as string, itemIndex);
+					outputs.push(
+						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
+					);
+					continue;
+				}
 				if (resource !== 'connection' || operation !== 'check') {
 					throw new NodeOperationError(this.getNode(), 'Unsupported StudioCMS operation', {
 						itemIndex,

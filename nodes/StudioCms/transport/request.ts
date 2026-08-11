@@ -1,4 +1,10 @@
-import type { IExecuteFunctions, IHttpRequestMethods, INode, JsonObject } from 'n8n-workflow';
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	IHttpRequestMethods,
+	INode,
+	JsonObject,
+} from 'n8n-workflow';
 import { NodeApiError, NodeOperationError } from 'n8n-workflow';
 
 import {
@@ -13,6 +19,8 @@ export interface StudioCmsRequestOptions {
 	method: IHttpRequestMethods;
 	path: string;
 	itemIndex: number;
+	body?: IDataObject;
+	qs?: IDataObject;
 }
 
 interface ErrorDetails {
@@ -208,6 +216,8 @@ export async function studioCmsApiRequest(
 				method: options.method,
 				url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}${options.path}`,
 				headers: { Accept: 'application/json' },
+				...(options.body === undefined ? {} : { body: options.body }),
+				...(options.qs === undefined ? {} : { qs: options.qs }),
 				timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
 				json: true,
 			},
@@ -215,6 +225,25 @@ export async function studioCmsApiRequest(
 	} catch (error) {
 		throw toStudioCmsApiError(this, error, options.itemIndex);
 	}
+}
+
+export async function studioCmsObjectRequest(
+	this: IExecuteFunctions,
+	options: StudioCmsRequestOptions,
+): Promise<JsonObject> {
+	const response = await studioCmsApiRequest.call(this, options);
+	if (!isJsonObject(response)) {
+		throw new NodeApiError(
+			this.getNode(),
+			{},
+			{
+				itemIndex: options.itemIndex,
+				message: 'StudioCMS returned a malformed response',
+				description: 'The response was expected to be a JSON object.',
+			},
+		);
+	}
+	return response;
 }
 
 export async function studioCmsCollectionRequest(
