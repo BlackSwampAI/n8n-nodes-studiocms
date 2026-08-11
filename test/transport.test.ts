@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
 	normalizeSiteUrl,
 	studioCmsCollectionRequest,
+	studioCmsObjectRequest,
 } from '../nodes/StudioCms/transport/request';
 import { createExecuteContext } from './helpers';
 
@@ -55,6 +56,25 @@ describe('StudioCMS transport', () => {
 			headers: { Accept: 'application/json' },
 			timeout: 30_000,
 			json: true,
+		});
+	});
+
+	it('passes optional query parameters and bodies through the shared authenticated helper', async () => {
+		const httpRequest = vi.fn().mockResolvedValue({ id: 123 });
+		const context = createExecuteContext({ httpRequest });
+
+		await studioCmsObjectRequest.call(context, {
+			method: 'PATCH',
+			path: '/categories/123',
+			itemIndex: 0,
+			body: { name: 'News' },
+			qs: { preview: true },
+		});
+
+		expect(httpRequest.mock.calls[0][1]).toMatchObject({
+			method: 'PATCH',
+			body: { name: 'News' },
+			qs: { preview: true },
 		});
 	});
 
@@ -118,6 +138,23 @@ describe('StudioCMS transport', () => {
 
 			const error = await studioCmsCollectionRequest
 				.call(context, { method: 'GET', path: '/categories', itemIndex: 3 })
+				.catch((caught: unknown) => caught);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
+			expect((error as NodeApiError).context.itemIndex).toBe(3);
+		},
+	);
+
+	it.each([null, [], 'not-json'])(
+		'rejects malformed successful object responses: %j',
+		async (response) => {
+			const context = createExecuteContext({
+				httpRequest: vi.fn().mockResolvedValue(response),
+			});
+
+			const error = await studioCmsObjectRequest
+				.call(context, { method: 'GET', path: '/categories/1', itemIndex: 3 })
 				.catch((caught: unknown) => caught);
 
 			expect(error).toBeInstanceOf(NodeApiError);

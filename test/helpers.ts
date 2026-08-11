@@ -9,9 +9,11 @@ export function createExecuteContext(options: {
 	continueOnFail?: boolean;
 	httpRequest?: ReturnType<typeof vi.fn>;
 	inputItems?: INodeExecutionData[];
+	parameters?: INodeParameters[];
 	siteUrls?: string[];
 } = {}): IExecuteFunctions {
 	const inputItems = options.inputItems ?? [{ json: { input: 0 } }];
+	const parameters = options.parameters ?? inputItems.map(() => ({}));
 	const siteUrls = options.siteUrls ?? inputItems.map(() => 'https://cms.example.com');
 	const httpRequest = options.httpRequest ?? vi.fn();
 	const node = {
@@ -31,7 +33,9 @@ export function createExecuteContext(options: {
 		}),
 		getInputData: () => inputItems,
 		getNode: () => node,
-		getNodeParameter: (name: string, _itemIndex: number, fallbackValue?: unknown) => {
+		getNodeParameter: (name: string, itemIndex: number, fallbackValue?: unknown) => {
+			const value = parameters[itemIndex]?.[name] ?? parameters[0]?.[name];
+			if (value !== undefined) return value;
 			if (name === 'resource') return 'connection';
 			if (name === 'operation') return 'check';
 			return fallbackValue;
