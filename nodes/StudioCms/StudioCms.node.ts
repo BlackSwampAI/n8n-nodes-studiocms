@@ -7,6 +7,7 @@ import type {
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { categoryFields, categoryOperations, executeCategory } from './resources/category';
+import { executeTag, tagFields, tagOperations } from './resources/tag';
 import { STUDIOCMS_CONNECTION_TEST_PATH } from './transport/constants';
 import { studioCmsCollectionRequest } from './transport/request';
 
@@ -53,6 +54,10 @@ export class StudioCms implements INodeType {
 						name: 'Connection',
 						value: 'connection',
 					},
+					{
+						name: 'Tag',
+						value: 'tag',
+					},
 				],
 				default: 'connection',
 			},
@@ -75,6 +80,8 @@ export class StudioCms implements INodeType {
 			},
 			...categoryOperations,
 			...categoryFields,
+			...tagOperations,
+			...tagFields,
 		],
 	};
 
@@ -88,6 +95,13 @@ export class StudioCms implements INodeType {
 				const operation = this.getNodeParameter('operation', itemIndex, 'check');
 				if (resource === 'category') {
 					const results = await executeCategory(this, operation as string, itemIndex);
+					outputs.push(
+						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
+					);
+					continue;
+				}
+				if (resource === 'tag') {
+					const results = await executeTag(this, operation as string, itemIndex);
 					outputs.push(
 						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
 					);

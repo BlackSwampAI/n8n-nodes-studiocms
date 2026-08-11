@@ -113,6 +113,55 @@ describe('StudioCMS transport', () => {
 		expect((error as NodeApiError).context.itemIndex).toBe(1);
 	});
 
+	it.each([
+		['tags', 'tag'],
+		['categories', 'category'],
+	])(
+		'maps an empty HTTP 500 for missing %s after confirming authentication',
+		async (path, resource) => {
+			const httpRequest = vi
+				.fn()
+				.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+				.mockResolvedValueOnce([]);
+			const context = createExecuteContext({ httpRequest });
+
+			const error = await studioCmsObjectRequest
+				.call(context, { method: 'GET', path: `/${path}/987`, itemIndex: 2 })
+				.catch((caught: unknown) => caught);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({
+				message: `StudioCMS ${resource} not found`,
+				httpCode: '404',
+			});
+			expect((error as NodeApiError).context.itemIndex).toBe(2);
+			expect((error as NodeApiError).description).toBe(
+				`No ${resource} exists with ID 987.`,
+			);
+			expect(httpRequest).toHaveBeenCalledTimes(2);
+			expect(httpRequest.mock.calls[1][1]).toMatchObject({
+				method: 'GET',
+				url: 'https://cms.example.com/studiocms_api/rest/v1/categories',
+			});
+		},
+	);
+
+	it('preserves invalid-token mapping when the missing-tag authentication probe also fails', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockRejectedValue({ response: { status: 500, data: '' } });
+		const context = createExecuteContext({ httpRequest });
+
+		const error = await studioCmsObjectRequest
+			.call(context, { method: 'GET', path: '/tags/987', itemIndex: 3 })
+			.catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS authentication failed', httpCode: '500' });
+		expect((error as NodeApiError).context.itemIndex).toBe(3);
+		expect(httpRequest).toHaveBeenCalledTimes(2);
+	});
+
 	it('maps network failures without exposing authorization data', async () => {
 		const failure = Object.assign(new Error('socket failed'), {
 			config: { headers: { Authorization: 'Bearer should-never-appear' } },

@@ -9,6 +9,7 @@ import { NodeApiError, NodeOperationError } from 'n8n-workflow';
 
 import {
 	STUDIOCMS_API_CREDENTIAL,
+	STUDIOCMS_CONNECTION_TEST_PATH,
 	STUDIOCMS_REQUEST_TIMEOUT_MS,
 	STUDIOCMS_REST_V1_PATH,
 } from './constants';
@@ -82,6 +83,41 @@ function extractErrorDetails(error: unknown): ErrorDetails {
 
 function apiErrorResponse(details: ErrorDetails): JsonObject {
 	return details.apiMessage === undefined ? {} : { error: details.apiMessage };
+}
+
+interface MissingResource {
+	id: string;
+	name: 'category' | 'tag';
+}
+
+function missingResource(
+	options: StudioCmsRequestOptions,
+	details: ErrorDetails,
+): MissingResource | undefined {
+	if (options.method !== 'GET' || details.statusCode !== 500 || details.apiMessage !== undefined) {
+		return undefined;
+	}
+	const match = /^\/(categories|tags)\/(\d+)$/.exec(options.path);
+	if (!match) return undefined;
+	return {
+		id: match[2],
+		name: match[1] === 'categories' ? 'category' : 'tag',
+	};
+}
+
+async function authenticatedProbe(context: IExecuteFunctions, siteUrl: string): Promise<boolean> {
+	try {
+		await context.helpers.httpRequestWithAuthentication.call(context, STUDIOCMS_API_CREDENTIAL, {
+			method: 'GET',
+			url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}${STUDIOCMS_CONNECTION_TEST_PATH}`,
+			headers: { Accept: 'application/json' },
+			timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
+			json: true,
+		});
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export function normalizeSiteUrl(value: unknown, node: INode, itemIndex = 0): string {
@@ -205,9 +241,10 @@ export async function studioCmsApiRequest(
 	this: IExecuteFunctions,
 	options: StudioCmsRequestOptions,
 ): Promise<unknown> {
+	let siteUrl: string | undefined;
 	try {
 		const credentials = await this.getCredentials(STUDIOCMS_API_CREDENTIAL, options.itemIndex);
-		const siteUrl = normalizeSiteUrl(credentials.siteUrl, this.getNode(), options.itemIndex);
+		siteUrl = normalizeSiteUrl(credentials.siteUrl, this.getNode(), options.itemIndex);
 
 		return await this.helpers.httpRequestWithAuthentication.call(
 			this,
@@ -223,6 +260,18 @@ export async function studioCmsApiRequest(
 			},
 			);
 	} catch (error) {
+		const details = extractErrorDetails(error);
+		const missing = missingResource(options, details);
+		// StudioCMS 0.4.4 returns an empty 500 for invalid tokens and missing taxonomy entries.
+		// A successful authenticated probe lets us distinguish the missing-resource case.
+		if (missing !== undefined && siteUrl !== undefined && (await authenticatedProbe(this, siteUrl))) {
+			throw new NodeApiError(this.getNode(), {}, {
+				itemIndex: options.itemIndex,
+				httpCode: '404',
+				message: `StudioCMS ${missing.name} not found`,
+				description: `No ${missing.name} exists with ID ${missing.id}.`,
+			});
+		}
 		throw toStudioCmsApiError(this, error, options.itemIndex);
 	}
 }
