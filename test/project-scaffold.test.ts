@@ -11,7 +11,7 @@ describe('project scaffold', () => {
 			license: 'MIT',
 			author: {
 				name: 'Blackswamp AI',
-				email: 'christopherjnelson@proton.me',
+				email: 'root@chris.guru',
 			},
 			repository: {
 				type: 'git',
@@ -27,7 +27,7 @@ describe('project scaffold', () => {
 			n8n: {
 				n8nNodesApiVersion: 1,
 				strict: true,
-				credentials: [],
+				credentials: ['dist/credentials/StudioCmsApi.credentials.js'],
 				nodes: ['dist/nodes/StudioCms/StudioCms.node.js'],
 			},
 			devDependencies: {
