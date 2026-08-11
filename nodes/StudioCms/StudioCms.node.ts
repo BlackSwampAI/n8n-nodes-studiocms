@@ -10,14 +10,20 @@ export class StudioCms implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'StudioCMS',
 		name: 'studioCms',
+		icon: {
+			light: 'file:studioCms.svg',
+			dark: 'file:studioCms.dark.svg',
+		},
 		group: ['transform'],
 		version: 1,
+		subtitle: 'StudioCMS REST API',
 		description: 'Work with the StudioCMS REST API',
 		defaults: {
 			name: 'StudioCMS',
 		},
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
+		usableAsTool: true,
 		properties: [],
 	};
 
@@ -25,4 +31,3 @@ export class StudioCms implements INodeType {
 		return [this.getInputData()];
 	}
 }
-

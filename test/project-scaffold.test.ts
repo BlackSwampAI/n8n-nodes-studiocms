@@ -1,18 +1,18 @@
-import { readFile } from 'node:fs/promises';
-
 import { describe, expect, it } from 'vitest';
 
-const readJson = async (path: string): Promise<Record<string, unknown>> =>
-	JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), 'utf8')) as Record<string, unknown>;
+import manifest from '../package.json';
+import tsconfig from '../tsconfig.json';
 
 describe('project scaffold', () => {
-	it('publishes the expected package identity and node registration', async () => {
-		const manifest = await readJson('package.json');
-
+	it('publishes the expected package identity and node registration', () => {
 		expect(manifest).toMatchObject({
 			name: 'n8n-nodes-studiocms',
 			version: '0.1.0',
 			license: 'MIT',
+			author: {
+				name: 'Blackswamp AI',
+				email: 'christopherjnelson@proton.me',
+			},
 			repository: {
 				type: 'git',
 				url: 'https://github.com/blackswampai/n8n-nodes-studiocms.git',
@@ -40,9 +40,7 @@ describe('project scaffold', () => {
 		});
 	});
 
-	it('uses strict TypeScript compiler settings', async () => {
-		const tsconfig = await readJson('tsconfig.json');
-
+	it('uses strict TypeScript compiler settings', () => {
 		expect(tsconfig.compilerOptions).toMatchObject({
 			strict: true,
 			noImplicitAny: true,

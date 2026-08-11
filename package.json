@@ -10,7 +10,8 @@
 		"studiocms"
 	],
 	"author": {
-		"name": "Blackswamp AI"
+		"name": "Blackswamp AI",
+		"email": "christopherjnelson@proton.me"
 	},
 	"repository": {
 		"type": "git",
@@ -34,7 +35,8 @@
 		"prepublishOnly": "n8n-node prerelease"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"THIRD_PARTY_NOTICES.md"
 	],
 	"publishConfig": {
 		"access": "public"
@@ -59,4 +61,3 @@
 		"n8n-workflow": "*"
 	}
 }
-
