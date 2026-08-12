@@ -1,0 +1,18 @@
+{
+	"node": "@blackswampai/n8n-nodes-studiocms.studioCms",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Data & Storage"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/BlackSwampAI/n8n-nodes-studiocms#credentials"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://github.com/BlackSwampAI/n8n-nodes-studiocms"
+			}
+		]
+	}
+}
