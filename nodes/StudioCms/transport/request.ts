@@ -87,22 +87,26 @@ function apiErrorResponse(details: ErrorDetails): JsonObject {
 
 interface MissingResource {
 	id: string;
-	name: 'category' | 'tag';
+	name: 'category' | 'folder' | 'tag';
 }
 
 function missingResource(
 	options: StudioCmsRequestOptions,
 	details: ErrorDetails,
 ): MissingResource | undefined {
-	if (options.method !== 'GET' || details.statusCode !== 500 || details.apiMessage !== undefined) {
+	if (details.statusCode !== 500 || details.apiMessage !== undefined) {
 		return undefined;
 	}
-	const match = /^\/(categories|tags)\/(\d+)$/.exec(options.path);
-	if (!match) return undefined;
-	return {
-		id: match[2],
-		name: match[1] === 'categories' ? 'category' : 'tag',
-	};
+	const taxonomy = /^\/(categories|tags)\/(\d+)$/.exec(options.path);
+	if (options.method === 'GET' && taxonomy) {
+		return {
+			id: taxonomy[2],
+			name: taxonomy[1] === 'categories' ? 'category' : 'tag',
+		};
+	}
+	const folder = /^\/folders\/([^/]+)$/.exec(options.path);
+	if (!folder || !['DELETE', 'GET', 'PATCH'].includes(options.method)) return undefined;
+	return { id: decodeURIComponent(folder[1]), name: 'folder' };
 }
 
 async function authenticatedProbe(context: IExecuteFunctions, siteUrl: string): Promise<boolean> {
@@ -118,6 +122,78 @@ async function authenticatedProbe(context: IExecuteFunctions, siteUrl: string): 
 	} catch {
 		return false;
 	}
+}
+
+async function authenticatedFolderExists(
+	context: IExecuteFunctions,
+	siteUrl: string,
+	path: string,
+): Promise<boolean> {
+	try {
+		const response = await context.helpers.httpRequestWithAuthentication.call(
+			context,
+			STUDIOCMS_API_CREDENTIAL,
+			{
+				method: 'GET',
+				url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}${path}`,
+				headers: { Accept: 'application/json' },
+				timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
+				json: true,
+			},
+		);
+		return isRecord(response);
+	} catch {
+		return false;
+	}
+}
+
+async function authenticatedFolderHasChildren(
+	context: IExecuteFunctions,
+	siteUrl: string,
+	folderId: string,
+): Promise<boolean> {
+	try {
+		const response = await context.helpers.httpRequestWithAuthentication.call(
+			context,
+			STUDIOCMS_API_CREDENTIAL,
+			{
+				method: 'GET',
+				url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}/folders`,
+				headers: { Accept: 'application/json' },
+				qs: { parent: folderId },
+				timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
+				json: true,
+			},
+		);
+		return Array.isArray(response) && response.length > 0;
+	} catch {
+		return false;
+	}
+}
+
+function folderMutationError(
+	context: IExecuteFunctions,
+	options: StudioCmsRequestOptions,
+	hasChildFolders: boolean,
+): NodeApiError {
+	if (options.method === 'DELETE' && hasChildFolders) {
+		return new NodeApiError(context.getNode(), {}, {
+			itemIndex: options.itemIndex,
+			httpCode: '500',
+			message: 'StudioCMS folder cannot be deleted',
+			description: 'Remove its child folders before deleting it.',
+		});
+	}
+	const operation = options.method === 'DELETE' ? 'delete' : 'update';
+	return new NodeApiError(context.getNode(), {}, {
+		itemIndex: options.itemIndex,
+		httpCode: '500',
+		message: `StudioCMS folder ${operation} failed`,
+		description:
+			options.method === 'DELETE'
+				? 'The folder may contain child pages, or StudioCMS could not complete the deletion.'
+				: 'Check the folder name and parent folder, then try again.',
+	});
 }
 
 export function normalizeSiteUrl(value: unknown, node: INode, itemIndex = 0): string {
@@ -262,9 +338,19 @@ export async function studioCmsApiRequest(
 	} catch (error) {
 		const details = extractErrorDetails(error);
 		const missing = missingResource(options, details);
-		// StudioCMS 0.4.4 returns an empty 500 for invalid tokens and missing taxonomy entries.
+		// StudioCMS 0.4.4 returns an empty 500 for invalid tokens and some missing resources.
 		// A successful authenticated probe lets us distinguish the missing-resource case.
 		if (missing !== undefined && siteUrl !== undefined && (await authenticatedProbe(this, siteUrl))) {
+			if (
+				missing.name === 'folder' &&
+				options.method !== 'GET' &&
+				(await authenticatedFolderExists(this, siteUrl, options.path))
+			) {
+				const hasChildFolders =
+					options.method === 'DELETE' &&
+					(await authenticatedFolderHasChildren(this, siteUrl, missing.id));
+				throw folderMutationError(this, options, hasChildFolders);
+			}
 			throw new NodeApiError(this.getNode(), {}, {
 				itemIndex: options.itemIndex,
 				httpCode: '404',
