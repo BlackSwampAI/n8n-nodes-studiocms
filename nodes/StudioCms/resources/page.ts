@@ -23,6 +23,12 @@ export const pageOperations: INodeProperties[] = [
 				action: 'Create a page',
 				description: 'Create a page and its default content entry',
 			},
+			{
+				name: 'Delete',
+				value: 'delete',
+				action: 'Delete a page',
+				description: 'Delete a page by ID',
+			},
 			{ name: 'Get', value: 'get', action: 'Get a page', description: 'Get a page by ID' },
 			{
 				name: 'Get Many',
@@ -57,7 +63,7 @@ export const pageFields: INodeProperties[] = [
 		required: true,
 		default: '',
 		description: 'String ID of the page',
-		displayOptions: { show: { resource: ['page'], operation: ['get', 'update'] } },
+		displayOptions: { show: { resource: ['page'], operation: ['delete', 'get', 'update'] } },
 	},
 	{
 		displayName: 'Update Fields',
@@ -309,7 +315,8 @@ export const pageFields: INodeProperties[] = [
 		type: 'string',
 		typeOptions: { rows: 8 },
 		default: '',
-		description: 'Initial Page content; StudioCMS creates its content ID and uses the Page language',
+		description:
+			'Initial Page content; StudioCMS creates its content ID and uses the Page language',
 		displayOptions: { show: { resource: ['page'], operation: ['create'] } },
 	},
 	{
@@ -385,11 +392,15 @@ export const pageFields: INodeProperties[] = [
 ];
 
 function malformedResponse(context: IExecuteFunctions, itemIndex: number): never {
-	throw new NodeApiError(context.getNode(), {}, {
-		itemIndex,
-		message: 'StudioCMS returned a malformed response',
-		description: 'The response did not match the StudioCMS page schema.',
-	});
+	throw new NodeApiError(
+		context.getNode(),
+		{},
+		{
+			itemIndex,
+			message: 'StudioCMS returned a malformed response',
+			description: 'The response did not match the StudioCMS page schema.',
+		},
+	);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -586,9 +597,7 @@ function sharedPageData(context: IExecuteFunctions, itemIndex: number): IDataObj
 		showContributors: encodedBoolean(
 			context.getNodeParameter('showContributors', itemIndex) as boolean,
 		),
-		parentFolder: nullableString(
-			context.getNodeParameter('parentFolder', itemIndex, '') as string,
-		),
+		parentFolder: nullableString(context.getNodeParameter('parentFolder', itemIndex, '') as string),
 		draft: encodedBoolean(context.getNodeParameter('draft', itemIndex) as boolean),
 		augments: encodedStringArray(
 			context,
@@ -692,12 +701,7 @@ function updateBody(
 	if ('contentLang' in fields) data.contentLang = fields.contentLang;
 	if ('heroImage' in fields) data.heroImage = nullableString(fields.heroImage as string);
 	if ('categories' in fields) {
-		data.categories = encodedStringArray(
-			context,
-			'Category IDs',
-			fields.categories,
-			itemIndex,
-		);
+		data.categories = encodedStringArray(context, 'Category IDs', fields.categories, itemIndex);
 	}
 	if ('tags' in fields) {
 		data.tags = encodedStringArray(context, 'Tag IDs', fields.tags, itemIndex);
@@ -725,7 +729,8 @@ function updateBody(
 				'contentEntryLang' in fields
 					? (fields.contentEntryLang as string)
 					: (selectedContent.contentLang as string),
-			content: 'content' in fields ? (fields.content as string) : (selectedContent.content as string),
+			content:
+				'content' in fields ? (fields.content as string) : (selectedContent.content as string),
 		},
 	};
 }
@@ -744,7 +749,10 @@ function getManyQuery(context: IExecuteFunctions, itemIndex: number): IDataObjec
 	if (typeof filters.parentFolder === 'string' && filters.parentFolder !== '') {
 		query.parentFolder = filters.parentFolder;
 	}
-	if (Object.prototype.hasOwnProperty.call(filters, 'draft') && typeof filters.draft === 'boolean') {
+	if (
+		Object.prototype.hasOwnProperty.call(filters, 'draft') &&
+		typeof filters.draft === 'boolean'
+	) {
 		query.draft = filters.draft.toString();
 	}
 	if (
@@ -767,6 +775,24 @@ export async function executePage(
 			path: '/pages',
 			itemIndex,
 			body: createBody(context, itemIndex),
+		});
+		return [{ json: validateMessage(context, response, itemIndex) }];
+	}
+
+	if (operation === 'delete') {
+		// StudioCMS requires the current slug in the DELETE payload. Resolve it from the Page so
+		// users only need its ID and cannot accidentally submit a stale slug.
+		const existingPage = await studioCmsObjectRequest.call(context, {
+			method: 'GET',
+			path: pagePath(context, itemIndex),
+			itemIndex,
+		});
+		const page = validatePage(context, existingPage, itemIndex);
+		const response = await studioCmsObjectRequest.call(context, {
+			method: 'DELETE',
+			path: pagePath(context, itemIndex),
+			itemIndex,
+			body: { slug: page.slug as string },
 		});
 		return [{ json: validateMessage(context, response, itemIndex) }];
 	}
