@@ -162,6 +162,91 @@ describe('StudioCMS transport', () => {
 		expect(httpRequest).toHaveBeenCalledTimes(2);
 	});
 
+	it('maps an empty HTTP 500 for a missing folder GET after confirming authentication', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([]);
+		const context = createExecuteContext({ httpRequest });
+
+		const error = await studioCmsObjectRequest
+			.call(context, { method: 'GET', path: '/folders/folder%2Fid', itemIndex: 6 })
+			.catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS folder not found', httpCode: '404' });
+		expect((error as NodeApiError).context.itemIndex).toBe(6);
+		expect((error as NodeApiError).description).toBe('No folder exists with ID folder/id.');
+		expect(httpRequest).toHaveBeenCalledTimes(2);
+	});
+
+	it.each(['DELETE', 'PATCH'] as const)(
+		'maps an empty HTTP 500 for a missing folder on %s after verifying the target is absent',
+		async (method) => {
+			const httpRequest = vi
+				.fn()
+				.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+				.mockResolvedValueOnce([])
+				.mockRejectedValueOnce({ response: { status: 500, data: '' } });
+			const context = createExecuteContext({ httpRequest });
+
+			const error = await studioCmsObjectRequest
+				.call(context, { method, path: '/folders/missing', itemIndex: 6 })
+				.catch((caught: unknown) => caught);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({ message: 'StudioCMS folder not found', httpCode: '404' });
+			expect(httpRequest).toHaveBeenCalledTimes(3);
+			expect(httpRequest.mock.calls[2][1]).toMatchObject({
+				method: 'GET',
+				url: 'https://cms.example.com/studiocms_api/rest/v1/folders/missing',
+			});
+		},
+	);
+
+	it('reports the child-folder constraint when StudioCMS returns an empty 500 for delete', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce({ id: 'parent-id', name: 'Parent', parent: null })
+			.mockResolvedValueOnce([{ id: 'child-id', name: 'Child', parent: 'parent-id' }]);
+		const context = createExecuteContext({ httpRequest });
+
+		const error = await studioCmsObjectRequest
+			.call(context, { method: 'DELETE', path: '/folders/parent-id', itemIndex: 8 })
+			.catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({
+			message: 'StudioCMS folder cannot be deleted',
+			httpCode: '500',
+		});
+		expect((error as NodeApiError).description).toBe(
+			'Remove its child folders before deleting it.',
+		);
+		expect(httpRequest).toHaveBeenCalledTimes(4);
+		expect(httpRequest.mock.calls[3][1]).toMatchObject({
+			method: 'GET',
+			url: 'https://cms.example.com/studiocms_api/rest/v1/folders',
+			qs: { parent: 'parent-id' },
+		});
+	});
+
+	it('preserves invalid-token mapping when the missing-folder authentication probe also fails', async () => {
+		const httpRequest = vi.fn().mockRejectedValue({ response: { status: 500, data: '' } });
+		const context = createExecuteContext({ httpRequest });
+
+		const error = await studioCmsObjectRequest
+			.call(context, { method: 'GET', path: '/folders/missing', itemIndex: 7 })
+			.catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS authentication failed', httpCode: '500' });
+		expect((error as NodeApiError).context.itemIndex).toBe(7);
+		expect(httpRequest).toHaveBeenCalledTimes(2);
+	});
+
 	it('maps network failures without exposing authorization data', async () => {
 		const failure = Object.assign(new Error('socket failed'), {
 			config: { headers: { Authorization: 'Bearer should-never-appear' } },

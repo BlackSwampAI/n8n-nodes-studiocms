@@ -9,6 +9,7 @@ n8n 2.34.4, and StudioCMS 0.4.4 or newer.
 
 - Connection: Check
 - Category: Create, Delete, Get, Get Many, Update
+- Folder: Create, Delete, Get, Get Many, Update
 - Tag: Create, Delete, Get, Get Many, Update
 
 ## Development

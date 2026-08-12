@@ -7,6 +7,7 @@ import type {
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { categoryFields, categoryOperations, executeCategory } from './resources/category';
+import { executeFolder, folderFields, folderOperations } from './resources/folder';
 import { executeTag, tagFields, tagOperations } from './resources/tag';
 import { STUDIOCMS_CONNECTION_TEST_PATH } from './transport/constants';
 import { studioCmsCollectionRequest } from './transport/request';
@@ -55,6 +56,10 @@ export class StudioCms implements INodeType {
 						value: 'connection',
 					},
 					{
+						name: 'Folder',
+						value: 'folder',
+					},
+					{
 						name: 'Tag',
 						value: 'tag',
 					},
@@ -80,6 +85,8 @@ export class StudioCms implements INodeType {
 			},
 			...categoryOperations,
 			...categoryFields,
+			...folderOperations,
+			...folderFields,
 			...tagOperations,
 			...tagFields,
 		],
@@ -95,6 +102,13 @@ export class StudioCms implements INodeType {
 				const operation = this.getNodeParameter('operation', itemIndex, 'check');
 				if (resource === 'category') {
 					const results = await executeCategory(this, operation as string, itemIndex);
+					outputs.push(
+						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
+					);
+					continue;
+				}
+				if (resource === 'folder') {
+					const results = await executeFolder(this, operation as string, itemIndex);
 					outputs.push(
 						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
 					);
