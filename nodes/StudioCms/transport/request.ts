@@ -109,7 +109,7 @@ function missingResource(
 		return { id: decodeURIComponent(folder[1]), name: 'folder' };
 	}
 	const page = /^\/pages\/([^/]+)$/.exec(options.path);
-	if (!['GET', 'PATCH'].includes(options.method) || !page) return undefined;
+	if (!['DELETE', 'GET', 'PATCH'].includes(options.method) || !page) return undefined;
 	return { id: decodeURIComponent(page[1]), name: 'page' };
 }
 
@@ -155,13 +155,20 @@ function pageMutationError(
 	context: IExecuteFunctions,
 	options: StudioCmsRequestOptions,
 ): NodeApiError {
-	return new NodeApiError(context.getNode(), {}, {
-		itemIndex: options.itemIndex,
-		httpCode: '500',
-		message: 'StudioCMS page update failed',
-		description:
-			'StudioCMS could not complete the update. Check the complete Page metadata and content payload, then try again.',
-	});
+	const operation = options.method === 'DELETE' ? 'delete' : 'update';
+	return new NodeApiError(
+		context.getNode(),
+		{},
+		{
+			itemIndex: options.itemIndex,
+			httpCode: '500',
+			message: `StudioCMS page ${operation} failed`,
+			description:
+				options.method === 'DELETE'
+					? 'StudioCMS could not complete the deletion. Confirm the Page still exists, then try again.'
+					: 'StudioCMS could not complete the update. Check the complete Page metadata and content payload, then try again.',
+		},
+	);
 }
 
 async function authenticatedFolderHasChildren(
@@ -194,23 +201,31 @@ function folderMutationError(
 	hasChildFolders: boolean,
 ): NodeApiError {
 	if (options.method === 'DELETE' && hasChildFolders) {
-		return new NodeApiError(context.getNode(), {}, {
-			itemIndex: options.itemIndex,
-			httpCode: '500',
-			message: 'StudioCMS folder cannot be deleted',
-			description: 'Remove its child folders before deleting it.',
-		});
+		return new NodeApiError(
+			context.getNode(),
+			{},
+			{
+				itemIndex: options.itemIndex,
+				httpCode: '500',
+				message: 'StudioCMS folder cannot be deleted',
+				description: 'Remove its child folders before deleting it.',
+			},
+		);
 	}
 	const operation = options.method === 'DELETE' ? 'delete' : 'update';
-	return new NodeApiError(context.getNode(), {}, {
-		itemIndex: options.itemIndex,
-		httpCode: '500',
-		message: `StudioCMS folder ${operation} failed`,
-		description:
-			options.method === 'DELETE'
-				? 'The folder may contain child pages, or StudioCMS could not complete the deletion.'
-				: 'Check the folder name and parent folder, then try again.',
-	});
+	return new NodeApiError(
+		context.getNode(),
+		{},
+		{
+			itemIndex: options.itemIndex,
+			httpCode: '500',
+			message: `StudioCMS folder ${operation} failed`,
+			description:
+				options.method === 'DELETE'
+					? 'The folder may contain child pages, or StudioCMS could not complete the deletion.'
+					: 'Check the folder name and parent folder, then try again.',
+		},
+	);
 }
 
 export function normalizeSiteUrl(value: unknown, node: INode, itemIndex = 0): string {
@@ -222,11 +237,9 @@ export function normalizeSiteUrl(value: unknown, node: INode, itemIndex = 0): st
 	try {
 		url = new URL(value.trim());
 	} catch {
-		throw new NodeOperationError(
-			node,
-			'StudioCMS Site URL must be a valid HTTP or HTTPS URL',
-			{ itemIndex },
-		);
+		throw new NodeOperationError(node, 'StudioCMS Site URL must be a valid HTTP or HTTPS URL', {
+			itemIndex,
+		});
 	}
 
 	if (!['http:', 'https:'].includes(url.protocol)) {
@@ -267,11 +280,15 @@ export function toStudioCmsApiError(
 		malformedJson &&
 		(details.statusCode === undefined || (details.statusCode >= 200 && details.statusCode < 300))
 	) {
-		return new NodeApiError(context.getNode(), {}, {
-			itemIndex,
-			message: 'StudioCMS returned a malformed response',
-			description: 'The response could not be parsed as JSON.',
-		});
+		return new NodeApiError(
+			context.getNode(),
+			{},
+			{
+				itemIndex,
+				message: 'StudioCMS returned a malformed response',
+				description: 'The response could not be parsed as JSON.',
+			},
+		);
 	}
 
 	if (details.statusCode === 401) {
@@ -282,11 +299,15 @@ export function toStudioCmsApiError(
 		});
 	}
 	if (details.statusCode === 500 && details.apiMessage === undefined) {
-		return new NodeApiError(context.getNode(), {}, {
-			...options,
-			message: 'StudioCMS authentication failed',
-			description: 'Check the API token and try again.',
-		});
+		return new NodeApiError(
+			context.getNode(),
+			{},
+			{
+				...options,
+				message: 'StudioCMS authentication failed',
+				description: 'Check the API token and try again.',
+			},
+		);
 	}
 	if (details.statusCode === 403 || details.apiMessage?.toLowerCase() === 'unauthorized') {
 		return new NodeApiError(context.getNode(), apiErrorResponse(details), {
@@ -313,7 +334,8 @@ export function toStudioCmsApiError(
 		return new NodeApiError(context.getNode(), apiErrorResponse(details), {
 			...options,
 			message: 'StudioCMS service failure',
-			description: details.apiMessage ?? 'StudioCMS could not process the request. Try again later.',
+			description:
+				details.apiMessage ?? 'StudioCMS could not process the request. Try again later.',
 		});
 	}
 	if (details.statusCode !== undefined) {
@@ -323,11 +345,15 @@ export function toStudioCmsApiError(
 			description: details.apiMessage ?? `StudioCMS returned HTTP ${details.statusCode}.`,
 		});
 	}
-	return new NodeApiError(context.getNode(), {}, {
-		itemIndex,
-		message: 'Unable to reach StudioCMS',
-		description: 'Check the Site URL and network connection, then try again.',
-	});
+	return new NodeApiError(
+		context.getNode(),
+		{},
+		{
+			itemIndex,
+			message: 'Unable to reach StudioCMS',
+			description: 'Check the Site URL and network connection, then try again.',
+		},
+	);
 }
 
 export async function studioCmsApiRequest(
@@ -339,28 +365,28 @@ export async function studioCmsApiRequest(
 		const credentials = await this.getCredentials(STUDIOCMS_API_CREDENTIAL, options.itemIndex);
 		siteUrl = normalizeSiteUrl(credentials.siteUrl, this.getNode(), options.itemIndex);
 
-		return await this.helpers.httpRequestWithAuthentication.call(
-			this,
-			STUDIOCMS_API_CREDENTIAL,
-			{
-				method: options.method,
-				url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}${options.path}`,
-				headers: { Accept: 'application/json' },
-				...(options.body === undefined ? {} : { body: options.body }),
-				...(options.qs === undefined ? {} : { qs: options.qs }),
-				timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
-				json: true,
-			},
-			);
+		return await this.helpers.httpRequestWithAuthentication.call(this, STUDIOCMS_API_CREDENTIAL, {
+			method: options.method,
+			url: `${siteUrl}${STUDIOCMS_REST_V1_PATH}${options.path}`,
+			headers: { Accept: 'application/json' },
+			...(options.body === undefined ? {} : { body: options.body }),
+			...(options.qs === undefined ? {} : { qs: options.qs }),
+			timeout: STUDIOCMS_REQUEST_TIMEOUT_MS,
+			json: true,
+		});
 	} catch (error) {
 		const details = extractErrorDetails(error);
 		const missing = missingResource(options, details);
 		// StudioCMS 0.4.4 returns an empty 500 for invalid tokens and some missing resources.
 		// A successful authenticated probe lets us distinguish the missing-resource case.
-		if (missing !== undefined && siteUrl !== undefined && (await authenticatedProbe(this, siteUrl))) {
+		if (
+			missing !== undefined &&
+			siteUrl !== undefined &&
+			(await authenticatedProbe(this, siteUrl))
+		) {
 			if (
 				missing.name === 'page' &&
-				options.method === 'PATCH' &&
+				['DELETE', 'PATCH'].includes(options.method) &&
 				(await authenticatedObjectExists(this, siteUrl, options.path))
 			) {
 				throw pageMutationError(this, options);
@@ -375,12 +401,16 @@ export async function studioCmsApiRequest(
 					(await authenticatedFolderHasChildren(this, siteUrl, missing.id));
 				throw folderMutationError(this, options, hasChildFolders);
 			}
-			throw new NodeApiError(this.getNode(), {}, {
-				itemIndex: options.itemIndex,
-				httpCode: '404',
-				message: `StudioCMS ${missing.name} not found`,
-				description: `No ${missing.name} exists with ID ${missing.id}.`,
-			});
+			throw new NodeApiError(
+				this.getNode(),
+				{},
+				{
+					itemIndex: options.itemIndex,
+					httpCode: '404',
+					message: `StudioCMS ${missing.name} not found`,
+					description: `No ${missing.name} exists with ID ${missing.id}.`,
+				},
+			);
 		}
 		throw toStudioCmsApiError(this, error, options.itemIndex);
 	}
@@ -411,11 +441,15 @@ export async function studioCmsCollectionRequest(
 ): Promise<JsonObject[]> {
 	const response = await studioCmsApiRequest.call(this, options);
 	if (!Array.isArray(response) || !response.every(isJsonObject)) {
-		throw new NodeApiError(this.getNode(), {}, {
-			itemIndex: options.itemIndex,
-			message: 'StudioCMS returned a malformed response',
-			description: 'The response was expected to be a JSON array of objects.',
-		});
+		throw new NodeApiError(
+			this.getNode(),
+			{},
+			{
+				itemIndex: options.itemIndex,
+				message: 'StudioCMS returned a malformed response',
+				description: 'The response was expected to be a JSON array of objects.',
+			},
+		);
 	}
 	return response;
 }

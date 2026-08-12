@@ -121,13 +121,12 @@ const updateValues = {
 };
 
 describe('Page operations', () => {
-	it('exposes Create, Get, Get Many, and selective Update with the official Page filters', () => {
+	it('exposes complete Page CRUD and the official Page filters', () => {
 		const properties = new StudioCms().description.properties;
 		const resource = properties.find((property) => property.name === 'resource');
 		const operation = properties.find(
 			(property) =>
-				property.name === 'operation' &&
-				property.displayOptions?.show?.resource?.includes('page'),
+				property.name === 'operation' && property.displayOptions?.show?.resource?.includes('page'),
 		);
 		const id = properties.find(
 			(property) =>
@@ -152,11 +151,16 @@ describe('Page operations', () => {
 		]);
 		expect(operation?.options).toEqual([
 			expect.objectContaining({ value: 'create' }),
+			expect.objectContaining({ value: 'delete' }),
 			expect.objectContaining({ value: 'get' }),
 			expect.objectContaining({ value: 'getMany' }),
 			expect.objectContaining({ value: 'update' }),
 		]);
-		expect(id).toMatchObject({ type: 'string', required: true });
+		expect(id).toMatchObject({
+			type: 'string',
+			required: true,
+			displayOptions: { show: { resource: ['page'], operation: ['delete', 'get', 'update'] } },
+		});
 		expect(updateFields?.options).toEqual([
 			expect.objectContaining({ name: 'augments' }),
 			expect.objectContaining({ name: 'categories' }),
@@ -283,6 +287,56 @@ describe('Page operations', () => {
 		expect(error).toBeInstanceOf(NodeOperationError);
 		expect(error).toMatchObject({ message: `Page ${field} must be a valid JSON array of strings` });
 		expect(httpRequest).not.toHaveBeenCalled();
+	});
+
+	it('gets the current slug and deletes a Page with the exact REST payload', async () => {
+		const response = { message: 'Page deleted successfully' };
+		const httpRequest = vi.fn().mockResolvedValueOnce(page).mockResolvedValueOnce(response);
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
+		});
+
+		const [output] = await execute(context);
+
+		expect(output).toEqual([{ json: response, pairedItem: { item: 0 } }]);
+		expect(httpRequest.mock.calls[0]).toEqual([
+			'studioCmsApi',
+			{
+				method: 'GET',
+				url: `https://cms.example.com/studiocms_api/rest/v1/pages/${pageId}`,
+				headers: { Accept: 'application/json' },
+				timeout: 30_000,
+				json: true,
+			},
+		]);
+		expect(httpRequest.mock.calls[1]).toEqual([
+			'studioCmsApi',
+			{
+				method: 'DELETE',
+				url: `https://cms.example.com/studiocms_api/rest/v1/pages/${pageId}`,
+				headers: { Accept: 'application/json' },
+				body: { slug: page.slug },
+				timeout: 30_000,
+				json: true,
+			},
+		]);
+	});
+
+	it('uses the current Page slug instead of requiring a duplicate n8n parameter', async () => {
+		const currentPage = { ...page, slug: 'renamed-api' };
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(currentPage)
+			.mockResolvedValueOnce({ message: 'Page deleted successfully' });
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
+		});
+
+		await execute(context);
+
+		expect(httpRequest.mock.calls[1][1]).toMatchObject({ body: { slug: 'renamed-api' } });
 	});
 
 	it('gets the current Page and sends every selected field with the exact REST payload', async () => {
@@ -471,9 +525,7 @@ describe('Page operations', () => {
 		const httpRequest = vi.fn().mockResolvedValueOnce(contentlessPage);
 		const context = createExecuteContext({
 			httpRequest,
-			parameters: [
-				pageParameters('update', { pageId, updateFields: { title: 'New title' } }),
-			],
+			parameters: [pageParameters('update', { pageId, updateFields: { title: 'New title' } })],
 		});
 
 		const error = await execute(context).catch((caught: unknown) => caught);
@@ -517,23 +569,47 @@ describe('Page operations', () => {
 		expect(httpRequest).toHaveBeenCalledTimes(1);
 	});
 
-	it.each(['create', 'update'])('rejects a malformed %s message response', async (operation) => {
-		const httpRequest =
-			operation === 'create'
-				? vi.fn().mockResolvedValue({ success: true })
-				: vi.fn().mockResolvedValueOnce(page).mockResolvedValueOnce({ success: true });
+	it('does not send DELETE when the current Page response is malformed', async () => {
+		const httpRequest = vi.fn().mockResolvedValueOnce({ ...page, slug: 42 });
 		const context = createExecuteContext({
 			httpRequest,
-			parameters: [
-				pageParameters(operation, operation === 'create' ? createValues : updateValues),
-			],
+			parameters: [pageParameters('delete', { pageId })],
 		});
 
 		const error = await execute(context).catch((caught: unknown) => caught);
 
 		expect(error).toBeInstanceOf(NodeApiError);
 		expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
+		expect(httpRequest).toHaveBeenCalledTimes(1);
 	});
+
+	it.each(['create', 'delete', 'update'])(
+		'rejects a malformed %s message response',
+		async (operation) => {
+			const httpRequest =
+				operation === 'create'
+					? vi.fn().mockResolvedValue({ success: true })
+					: vi.fn().mockResolvedValueOnce(page).mockResolvedValueOnce({ success: true });
+			const context = createExecuteContext({
+				httpRequest,
+				parameters: [
+					pageParameters(
+						operation,
+						operation === 'create'
+							? createValues
+							: operation === 'delete'
+								? { pageId }
+								: updateValues,
+					),
+				],
+			});
+
+			const error = await execute(context).catch((caught: unknown) => caught);
+
+			expect(error).toBeInstanceOf(NodeApiError);
+			expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
+		},
+	);
 
 	it('maps a missing Page during the reconciliation read', async () => {
 		const httpRequest = vi
@@ -543,6 +619,24 @@ describe('Page operations', () => {
 		const context = createExecuteContext({
 			httpRequest,
 			parameters: [pageParameters('update', updateValues)],
+		});
+
+		const error = await execute(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS page not found', httpCode: '404' });
+		expect((error as NodeApiError).description).toBe(`No page exists with ID ${pageId}.`);
+		expect(httpRequest).toHaveBeenCalledTimes(2);
+	});
+
+	it('maps a missing Page before DELETE without sending a mutation', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([]);
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
 		});
 
 		const error = await execute(context).catch((caught: unknown) => caught);
@@ -591,6 +685,65 @@ describe('Page operations', () => {
 		expect(httpRequest).toHaveBeenCalledTimes(4);
 	});
 
+	it('maps a Page removed between the slug read and DELETE as not found', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(page)
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([])
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } });
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
+		});
+
+		const error = await execute(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS page not found', httpCode: '404' });
+		expect(httpRequest).toHaveBeenCalledTimes(4);
+	});
+
+	it('keeps an ambiguous authenticated DELETE failure on an existing Page as a delete failure', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(page)
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce(page);
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
+		});
+
+		const error = await execute(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS page delete failed', httpCode: '500' });
+		expect((error as NodeApiError).description).toBe(
+			'StudioCMS could not complete the deletion. Confirm the Page still exists, then try again.',
+		);
+		expect(httpRequest).toHaveBeenCalledTimes(4);
+	});
+
+	it('preserves invalid-token classification when DELETE returns an ambiguous failure', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(page)
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } });
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('delete', { pageId })],
+		});
+
+		const error = await execute(context).catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS authentication failed' });
+		expect(httpRequest).toHaveBeenCalledTimes(3);
+	});
+
 	it('preserves invalid-token classification during the reconciliation read', async () => {
 		const httpRequest = vi
 			.fn()
@@ -628,29 +781,33 @@ describe('Page operations', () => {
 
 	it.each([
 		['create', createValues],
+		['delete', { pageId }],
 		['update', updateValues],
-	])('returns a paired sanitized API error for Page %s with continueOnFail', async (operation, values) => {
-		const failure = {
-			config: { headers: { Authorization: 'Bearer mutation-secret-token' } },
-			response: { status: 400, data: { error: 'Invalid Page mutation' } },
-		};
-		const httpRequest =
-			operation === 'create'
-				? vi.fn().mockRejectedValue(failure)
-				: vi.fn().mockResolvedValueOnce(page).mockRejectedValueOnce(failure);
-		const context = createExecuteContext({
-			continueOnFail: true,
-			httpRequest,
-			parameters: [pageParameters(operation, values)],
-		});
+	])(
+		'returns a paired sanitized API error for Page %s with continueOnFail',
+		async (operation, values) => {
+			const failure = {
+				config: { headers: { Authorization: 'Bearer mutation-secret-token' } },
+				response: { status: 400, data: { error: 'Invalid Page mutation' } },
+			};
+			const httpRequest =
+				operation === 'create'
+					? vi.fn().mockRejectedValue(failure)
+					: vi.fn().mockResolvedValueOnce(page).mockRejectedValueOnce(failure);
+			const context = createExecuteContext({
+				continueOnFail: true,
+				httpRequest,
+				parameters: [pageParameters(operation, values)],
+			});
 
-		const [output] = await execute(context);
+			const [output] = await execute(context);
 
-		expect(output).toEqual([
-			{ json: { error: 'StudioCMS rejected the request' }, pairedItem: { item: 0 } },
-		]);
-		expect(JSON.stringify(output)).not.toContain('mutation-secret-token');
-	});
+			expect(output).toEqual([
+				{ json: { error: 'StudioCMS rejected the request' }, pairedItem: { item: 0 } },
+			]);
+			expect(JSON.stringify(output)).not.toContain('mutation-secret-token');
+		},
+	);
 
 	it('executes mixed Page Create and Update items with their own payloads and pairing', async () => {
 		const createResponse = { message: `Page created successfully with id: ${pageId}` };
@@ -662,9 +819,7 @@ describe('Page operations', () => {
 				...page,
 				id: 'second-page-id',
 				defaultContent: { ...content, id: 'second-content-id', contentId: 'second-page-id' },
-				multiLangContent: [
-					{ ...content, id: 'second-content-id', contentId: 'second-page-id' },
-				],
+				multiLangContent: [{ ...content, id: 'second-content-id', contentId: 'second-page-id' }],
 			})
 			.mockResolvedValueOnce(updateResponse);
 		const context = createExecuteContext({
@@ -700,6 +855,61 @@ describe('Page operations', () => {
 		});
 	});
 
+	it('deletes multiple Page items with their current slugs and pairing', async () => {
+		const secondPage = { ...page, id: 'second-page-id', slug: 'second-page' };
+		const firstResponse = { message: 'First Page deleted successfully' };
+		const secondResponse = { message: 'Second Page deleted successfully' };
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(page)
+			.mockResolvedValueOnce(firstResponse)
+			.mockResolvedValueOnce(secondPage)
+			.mockResolvedValueOnce(secondResponse);
+		const context = createExecuteContext({
+			httpRequest,
+			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
+			parameters: [
+				pageParameters('delete', { pageId }),
+				pageParameters('delete', { pageId: secondPage.id }),
+			],
+		});
+
+		const [output] = await execute(context);
+
+		expect(output).toEqual([
+			{ json: firstResponse, pairedItem: { item: 0 } },
+			{ json: secondResponse, pairedItem: { item: 1 } },
+		]);
+		expect(httpRequest.mock.calls[1][1]).toMatchObject({ body: { slug: page.slug } });
+		expect(httpRequest.mock.calls[3][1]).toMatchObject({ body: { slug: secondPage.slug } });
+	});
+
+	it('continues from a failed Page Delete to a later Page Get when enabled', async () => {
+		const secondPage = { ...page, id: 'second-page-id', slug: 'second-page' };
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce(page)
+			.mockRejectedValueOnce({ response: { status: 400, data: { error: 'Invalid Page' } } })
+			.mockResolvedValueOnce(secondPage);
+		const context = createExecuteContext({
+			continueOnFail: true,
+			httpRequest,
+			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
+			parameters: [
+				pageParameters('delete', { pageId }),
+				pageParameters('get', { pageId: secondPage.id }),
+			],
+		});
+
+		const [output] = await execute(context);
+
+		expect(output).toEqual([
+			{ json: { error: 'StudioCMS rejected the request' }, pairedItem: { item: 0 } },
+			{ json: secondPage, pairedItem: { item: 1 } },
+		]);
+		expect(httpRequest).toHaveBeenCalledTimes(3);
+	});
+
 	it('continues from a failed Page Create to a later Page Update when enabled', async () => {
 		const updateResponse = { message: 'Page updated successfully' };
 		const httpRequest = vi
@@ -711,10 +921,7 @@ describe('Page operations', () => {
 			continueOnFail: true,
 			httpRequest,
 			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
-			parameters: [
-				pageParameters('create', createValues),
-				pageParameters('update', updateValues),
-			],
+			parameters: [pageParameters('create', createValues), pageParameters('update', updateValues)],
 		});
 
 		const [output] = await execute(context);
@@ -758,9 +965,7 @@ describe('Page operations', () => {
 			const httpRequest = vi.fn().mockResolvedValue([page]);
 			const context = createExecuteContext({
 				httpRequest,
-				parameters: [
-					pageParameters('getMany', { filters: { [name]: value }, returnAll: true }),
-				],
+				parameters: [pageParameters('getMany', { filters: { [name]: value }, returnAll: true })],
 			});
 
 			await execute(context);
