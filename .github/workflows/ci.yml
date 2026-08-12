@@ -30,9 +30,11 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Audit release configuration
+        run: npm run release:check
+
       - name: Run lint
         run: npm run lint
 
       - name: Build package
         run: npm run build
-

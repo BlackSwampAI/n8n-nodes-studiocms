@@ -6,22 +6,25 @@ import tsconfig from '../tsconfig.json';
 describe('project scaffold', () => {
 	it('publishes the expected package identity and node registration', () => {
 		expect(manifest).toMatchObject({
-			name: 'n8n-nodes-studiocms',
+			name: '@blackswampai/n8n-nodes-studiocms',
 			version: '0.1.0',
 			license: 'MIT',
 			author: {
-				name: 'Blackswamp AI',
+				name: 'BlackSwamp AI',
 				email: 'root@chris.guru',
 			},
 			repository: {
 				type: 'git',
-				url: 'https://github.com/blackswampai/n8n-nodes-studiocms.git',
+				url: 'https://github.com/BlackSwampAI/n8n-nodes-studiocms.git',
 			},
 			engines: { node: '>=22.22.0' },
 			scripts: {
 				build: 'n8n-node build',
 				lint: 'n8n-node lint',
 				test: 'vitest run',
+				release: 'n8n-node release',
+				prepublishOnly: 'n8n-node prerelease',
+				'release:check': 'node scripts/release-check.mjs',
 			},
 			publishConfig: { access: 'public' },
 			n8n: {
