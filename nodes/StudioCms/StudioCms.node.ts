@@ -8,6 +8,7 @@ import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workf
 
 import { categoryFields, categoryOperations, executeCategory } from './resources/category';
 import { executeFolder, folderFields, folderOperations } from './resources/folder';
+import { executePage, pageFields, pageOperations } from './resources/page';
 import { executeTag, tagFields, tagOperations } from './resources/tag';
 import { STUDIOCMS_CONNECTION_TEST_PATH } from './transport/constants';
 import { studioCmsCollectionRequest } from './transport/request';
@@ -60,6 +61,10 @@ export class StudioCms implements INodeType {
 						value: 'folder',
 					},
 					{
+						name: 'Page',
+						value: 'page',
+					},
+					{
 						name: 'Tag',
 						value: 'tag',
 					},
@@ -87,6 +92,8 @@ export class StudioCms implements INodeType {
 			...categoryFields,
 			...folderOperations,
 			...folderFields,
+			...pageOperations,
+			...pageFields,
 			...tagOperations,
 			...tagFields,
 		],
@@ -109,6 +116,13 @@ export class StudioCms implements INodeType {
 				}
 				if (resource === 'folder') {
 					const results = await executeFolder(this, operation as string, itemIndex);
+					outputs.push(
+						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
+					);
+					continue;
+				}
+				if (resource === 'page') {
+					const results = await executePage(this, operation as string, itemIndex);
 					outputs.push(
 						...results.map((result) => ({ ...result, pairedItem: { item: itemIndex } })),
 					);
