@@ -180,6 +180,28 @@ describe('StudioCMS transport', () => {
 		expect(httpRequest).toHaveBeenCalledTimes(2);
 	});
 
+	it('maps an empty HTTP 500 for a missing page GET after confirming authentication', async () => {
+		const httpRequest = vi
+			.fn()
+			.mockRejectedValueOnce({ response: { status: 500, data: '' } })
+			.mockResolvedValueOnce([]);
+		const context = createExecuteContext({ httpRequest });
+
+		const error = await studioCmsObjectRequest
+			.call(context, { method: 'GET', path: '/pages/page%2Fid', itemIndex: 9 })
+			.catch((caught: unknown) => caught);
+
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS page not found', httpCode: '404' });
+		expect((error as NodeApiError).context.itemIndex).toBe(9);
+		expect((error as NodeApiError).description).toBe('No page exists with ID page/id.');
+		expect(httpRequest).toHaveBeenCalledTimes(2);
+		expect(httpRequest.mock.calls[1][1]).toMatchObject({
+			method: 'GET',
+			url: 'https://cms.example.com/studiocms_api/rest/v1/categories',
+		});
+	});
+
 	it.each(['DELETE', 'PATCH'] as const)(
 		'maps an empty HTTP 500 for a missing folder on %s after verifying the target is absent',
 		async (method) => {

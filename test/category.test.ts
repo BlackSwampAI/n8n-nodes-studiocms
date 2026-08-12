@@ -35,6 +35,7 @@ describe('Category operations', () => {
 			expect.objectContaining({ name: 'Category', value: 'category' }),
 			expect.objectContaining({ name: 'Connection', value: 'connection' }),
 			expect.objectContaining({ name: 'Folder', value: 'folder' }),
+			expect.objectContaining({ name: 'Page', value: 'page' }),
 			expect.objectContaining({ name: 'Tag', value: 'tag' }),
 		]);
 		expect(operation?.options).toEqual([

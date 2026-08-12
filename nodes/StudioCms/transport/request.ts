@@ -87,7 +87,7 @@ function apiErrorResponse(details: ErrorDetails): JsonObject {
 
 interface MissingResource {
 	id: string;
-	name: 'category' | 'folder' | 'tag';
+	name: 'category' | 'folder' | 'page' | 'tag';
 }
 
 function missingResource(
@@ -105,8 +105,12 @@ function missingResource(
 		};
 	}
 	const folder = /^\/folders\/([^/]+)$/.exec(options.path);
-	if (!folder || !['DELETE', 'GET', 'PATCH'].includes(options.method)) return undefined;
-	return { id: decodeURIComponent(folder[1]), name: 'folder' };
+	if (folder && ['DELETE', 'GET', 'PATCH'].includes(options.method)) {
+		return { id: decodeURIComponent(folder[1]), name: 'folder' };
+	}
+	const page = /^\/pages\/([^/]+)$/.exec(options.path);
+	if (options.method !== 'GET' || !page) return undefined;
+	return { id: decodeURIComponent(page[1]), name: 'page' };
 }
 
 async function authenticatedProbe(context: IExecuteFunctions, siteUrl: string): Promise<boolean> {
