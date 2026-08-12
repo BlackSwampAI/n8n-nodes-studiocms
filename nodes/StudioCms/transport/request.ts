@@ -109,7 +109,7 @@ function missingResource(
 		return { id: decodeURIComponent(folder[1]), name: 'folder' };
 	}
 	const page = /^\/pages\/([^/]+)$/.exec(options.path);
-	if (options.method !== 'GET' || !page) return undefined;
+	if (!['GET', 'PATCH'].includes(options.method) || !page) return undefined;
 	return { id: decodeURIComponent(page[1]), name: 'page' };
 }
 
@@ -128,7 +128,7 @@ async function authenticatedProbe(context: IExecuteFunctions, siteUrl: string): 
 	}
 }
 
-async function authenticatedFolderExists(
+async function authenticatedObjectExists(
 	context: IExecuteFunctions,
 	siteUrl: string,
 	path: string,
@@ -149,6 +149,19 @@ async function authenticatedFolderExists(
 	} catch {
 		return false;
 	}
+}
+
+function pageMutationError(
+	context: IExecuteFunctions,
+	options: StudioCmsRequestOptions,
+): NodeApiError {
+	return new NodeApiError(context.getNode(), {}, {
+		itemIndex: options.itemIndex,
+		httpCode: '500',
+		message: 'StudioCMS page update failed',
+		description:
+			'StudioCMS could not complete the update. Check the complete Page metadata and content payload, then try again.',
+	});
 }
 
 async function authenticatedFolderHasChildren(
@@ -346,9 +359,16 @@ export async function studioCmsApiRequest(
 		// A successful authenticated probe lets us distinguish the missing-resource case.
 		if (missing !== undefined && siteUrl !== undefined && (await authenticatedProbe(this, siteUrl))) {
 			if (
+				missing.name === 'page' &&
+				options.method === 'PATCH' &&
+				(await authenticatedObjectExists(this, siteUrl, options.path))
+			) {
+				throw pageMutationError(this, options);
+			}
+			if (
 				missing.name === 'folder' &&
 				options.method !== 'GET' &&
-				(await authenticatedFolderExists(this, siteUrl, options.path))
+				(await authenticatedObjectExists(this, siteUrl, options.path))
 			) {
 				const hasChildFolders =
 					options.method === 'DELETE' &&
