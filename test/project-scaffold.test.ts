@@ -7,7 +7,10 @@ describe('project scaffold', () => {
 	it('publishes the expected package identity and node registration', () => {
 		expect(manifest).toMatchObject({
 			name: '@blackswampai/n8n-nodes-studiocms',
-			version: '0.1.0',
+			// Asserting a literal here breaks the suite on every release without
+			// adding protection: package.json is the source of truth for the
+			// version. Check the shape instead.
+			version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
 			license: 'MIT',
 			author: {
 				name: 'BlackSwamp AI',
