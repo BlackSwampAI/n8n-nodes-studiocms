@@ -1,6 +1,6 @@
 # Releasing StudioCMS for n8n
 
-Publication is tag-driven through `.github/workflows/publish.yml`; never publish locally.
+Publication is tag-driven through `.github/workflows/publish.yml`; never publish locally. After `publish` succeeds, a separate dependent `verify-published` job runs registry/provenance scanning. If only verification fails, GitHub Actions **Re-run failed jobs** reruns the verifier without invoking `npm run release`; never rerun a successful publish job for an immutable version.
 
 Before tagging, confirm the repository is public, CI is green on the exact commit, npm Trusted
 Publisher is configured for `BlackSwampAI/n8n-nodes-studiocms` and `publish.yml`, and no legacy
