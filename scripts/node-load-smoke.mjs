@@ -23,8 +23,10 @@ for (const [registration, owner, icon] of [
 	[manifest.n8n.credentials[0], credential.name, credential.icon],
 ]) {
 	const references = typeof icon === 'string' ? [icon] : [icon?.light, icon?.dark];
-	if (!references.some(Boolean)) throw new Error(`Packaged icon is required for ${owner}`);
-	for (const reference of references.filter(Boolean)) {
+	if (typeof icon === 'string' ? !icon : references.some((reference) => !reference)) {
+		throw new Error(`Every packaged icon variant is required for ${owner}`);
+	}
+	for (const reference of references) {
 		if (!reference.startsWith('file:'))
 			throw new Error(`Icon must use a packaged file: reference for ${owner}`);
 		const path = resolve(packageRoot, registration, '..', reference.slice(5));

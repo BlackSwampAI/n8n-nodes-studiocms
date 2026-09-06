@@ -150,17 +150,17 @@ for (const path of [
 	if (!existsSync(resolve(root, path))) fail(`${path} is required`);
 }
 
-for (const path of ['nodes/StudioCms/studioCms.svg', 'nodes/StudioCms/studioCms.dark.svg']) {
+const expectedIconHashes = {
+	'nodes/StudioCms/studioCms.svg':
+		'5276da8af87725a949a580e824a9ce771de68c4a4560a1e81938687b9db49af6',
+	'nodes/StudioCms/studioCms.dark.svg':
+		'e3931df40a46753f93cbcd6197f7e972dde2c322920cc95c40730412333aa5fc',
+};
+for (const [path, expectedHash] of Object.entries(expectedIconHashes)) {
 	const hash = createHash('sha256')
 		.update(readFileSync(resolve(root, path)))
 		.digest('hex');
-	if (
-		![
-			'5276da8af87725a949a580e824a9ce771de68c4a4560a1e81938687b9db49af6',
-			'e3931df40a46753f93cbcd6197f7e972dde2c322920cc95c40730412333aa5fc',
-		].includes(hash)
-	)
-		fail(`StudioCMS icon hash changed: ${path}`);
+	if (hash !== expectedHash) fail(`StudioCMS icon hash changed: ${path}`);
 }
 
 try {
