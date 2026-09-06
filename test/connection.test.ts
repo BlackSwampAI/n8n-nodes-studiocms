@@ -10,7 +10,10 @@ async function execute(context: ReturnType<typeof createExecuteContext>) {
 
 describe('Connection: Check', () => {
 	it('checks every input item and preserves pairing', async () => {
-		const httpRequest = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 1 }]);
+		const httpRequest = vi
+			.fn()
+			.mockResolvedValueOnce([])
+			.mockResolvedValueOnce([{ id: 1 }]);
 		const context = createExecuteContext({
 			httpRequest,
 			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.1.2 - 2026-09-06
+
+### Changed
+
+- Added official n8n source/built scanner preflight and explicit post-publication verification.
+- Added strict test typechecking, deterministic npm tooling, package boundary, compiled-load, and
+  isolated packed-install release gates.
+- Hardened tag-only Trusted Publisher/OIDC workflows and refreshed evergreen user/release docs.
+- Documented official StudioCMS branding provenance and independent-integration status.
+
 ## 0.1.1 - 2026-08-22
 
 ### Changed

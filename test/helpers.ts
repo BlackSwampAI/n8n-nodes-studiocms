@@ -1,19 +1,17 @@
-import type {
-	IExecuteFunctions,
-	INodeExecutionData,
-	INodeParameters,
-} from 'n8n-workflow';
+import type { IExecuteFunctions, INodeExecutionData, INodeParameters } from 'n8n-workflow';
 import { vi } from 'vitest';
 
-export function createExecuteContext(options: {
-	continueOnFail?: boolean;
-	httpRequest?: ReturnType<typeof vi.fn>;
-	inputItems?: INodeExecutionData[];
-	parameters?: INodeParameters[];
-	siteUrls?: string[];
-} = {}): IExecuteFunctions {
+export function createExecuteContext(
+	options: {
+		continueOnFail?: boolean;
+		httpRequest?: ReturnType<typeof vi.fn>;
+		inputItems?: INodeExecutionData[];
+		parameters?: INodeParameters[];
+		siteUrls?: string[];
+	} = {},
+): IExecuteFunctions {
 	const inputItems = options.inputItems ?? [{ json: { input: 0 } }];
-	const parameters = options.parameters ?? inputItems.map(() => ({}));
+	const parameters: INodeParameters[] = options.parameters ?? inputItems.map(() => ({}));
 	const siteUrls = options.siteUrls ?? inputItems.map(() => 'https://cms.example.com');
 	const httpRequest = options.httpRequest ?? vi.fn();
 	const node = {

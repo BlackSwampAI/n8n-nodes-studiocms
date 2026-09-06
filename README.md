@@ -1,36 +1,43 @@
 # @blackswampai/n8n-nodes-studiocms
 
-An [n8n](https://n8n.io/) community node for the authenticated StudioCMS REST API v1.
+[![npm version](https://img.shields.io/npm/v/%40blackswampai%2Fn8n-nodes-studiocms.svg)](https://www.npmjs.com/package/@blackswampai/n8n-nodes-studiocms)
+[![CI](https://github.com/BlackSwampAI/n8n-nodes-studiocms/actions/workflows/ci.yml/badge.svg)](https://github.com/BlackSwampAI/n8n-nodes-studiocms/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+
+[Installation](#installation) · [Credentials](#credentials) · [Operations](#operations) ·
+[Usage](#usage) · [Troubleshooting](#troubleshooting) · [Black Swamp AI](https://blackswampai.com/n8n-nodes/studiocms/)
+
+An n8n community integration for the authenticated StudioCMS REST API v1.
+
+This is an independent Black Swamp AI community integration. It is not affiliated with,
+endorsed by, sponsored by, or maintained by StudioCMS. The StudioCMS name and logo belong to
+their respective owners and are used only to identify compatibility.
 
 ## Installation
 
-Install `@blackswampai/n8n-nodes-studiocms` from **Settings > Community Nodes** in a
-self-hosted n8n instance. Enter the complete scoped package name when prompted.
-
-For local development:
-
-```sh
-npm ci
-npm run dev
-```
+On the n8n canvas, open the nodes panel, search for **StudioCMS**, select it under **More from the
+community**, and choose **Install**. On self-hosted n8n, administrators may alternatively install
+the exact package name `@blackswampai/n8n-nodes-studiocms` through Community Nodes settings.
 
 ## Compatibility
 
-- Node.js 22.22.0 or newer
-- n8n 2.34.4 or newer
-- StudioCMS 0.4.4 or newer with the REST API enabled
+| Component | Supported/tested baseline            |
+| --------- | ------------------------------------ |
+| Node.js   | 22.22.0 or newer                     |
+| n8n       | 2.34.4 or newer                      |
+| StudioCMS | 0.4.4 or newer with REST API enabled |
 
-Version 0.1.0 has been developed and tested against these versions.
+The 0.1 line was developed against this baseline. Later compatible versions should work, but
+breaking upstream API changes may require an integration update.
 
 ## Credentials
 
-Create a **StudioCMS API** credential in n8n with:
+Create a **StudioCMS API** credential with:
 
-- **Site URL**: the public base URL of the StudioCMS site, such as `https://cms.example.com`
-- **API Token**: a token created in the API Tokens section of the StudioCMS user profile
+- **Site URL**: the public root URL of the StudioCMS site
+- **API Token**: a token created in the StudioCMS user profile
 
-The credential includes an n8n connection test. It requests the StudioCMS categories endpoint
-and reports invalid tokens before a workflow is run.
+The credential test performs a harmless authenticated category-list request.
 
 ## Operations
 
@@ -40,22 +47,37 @@ and reports invalid tokens before a workflow is run.
 - Page: Create, Delete, Get, Get Many, Update
 - Tag: Create, Delete, Get, Get Many, Update
 
-Posts and user/settings operations are not included in 0.1.0.
+Posts and user/settings administration are not included.
 
-## Development
+## Usage
 
-```sh
-npm ci
-npm test
-npm run lint
-npm run build
-npm run release:check
-npm pack --dry-run
-```
+Add **StudioCMS**, select a resource and operation, choose the StudioCMS API credential, then map
+input values with ordinary n8n expressions. Get Many operations support **Return All** and
+**Limit**. IDs can be taken from preceding list results.
 
-See [RELEASING.md](RELEASING.md) for the provenance-backed release procedure. Bugs and feature
-requests can be filed in the [GitHub issue tracker](https://github.com/BlackSwampAI/n8n-nodes-studiocms/issues).
+## Troubleshooting
+
+- Confirm the Site URL is the public application root, without a REST path suffix.
+- Confirm the REST API is enabled and the token remains active.
+- A 401 indicates invalid credentials; a 404 usually indicates the selected object or API route
+  is unavailable on that StudioCMS installation.
+
+## Resources
+
+- [StudioCMS REST API documentation](https://docs.studiocms.dev/en/how-it-works/restapi/)
+- [Issue tracker](https://github.com/BlackSwampAI/n8n-nodes-studiocms/issues)
+- [API contract and validation evidence](docs/api-matrix.md)
+- [Testing](docs/testing.md)
+- [Branding provenance](docs/branding.md)
+- [Release procedure](RELEASING.md)
+
+## Release provenance
+
+Releases are published only from immutable version tags through GitHub Actions with npm
+provenance. The source and built package are checked with the official n8n community-package
+scanner before publication, then the registry package and attested source are checked afterward.
 
 ## License
 
-[MIT](LICENSE.md)
+The integration code is available under the [MIT License](LICENSE.md). See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for StudioCMS logo attribution.

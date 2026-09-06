@@ -13,8 +13,8 @@ describe('project scaffold', () => {
 			version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
 			license: 'MIT',
 			author: {
-				name: 'BlackSwamp AI',
-				email: 'root@chris.guru',
+				name: 'Christopher J. Nelson',
+				email: 'christopherjnelson@proton.me',
 			},
 			repository: {
 				type: 'git',
@@ -37,8 +37,9 @@ describe('project scaffold', () => {
 				nodes: ['dist/nodes/StudioCms/StudioCms.node.js'],
 			},
 			devDependencies: {
-				'@n8n/node-cli': '0.43.2',
-				vitest: '4.1.10',
+				'@n8n/node-cli': '0.46.4',
+				'@n8n/scan-community-package': '0.34.0',
+				vitest: '4.1.11',
 			},
 			peerDependencies: {
 				'n8n-workflow': '*',

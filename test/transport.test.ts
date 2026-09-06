@@ -135,9 +135,7 @@ describe('StudioCMS transport', () => {
 				httpCode: '404',
 			});
 			expect((error as NodeApiError).context.itemIndex).toBe(2);
-			expect((error as NodeApiError).description).toBe(
-				`No ${resource} exists with ID 987.`,
-			);
+			expect((error as NodeApiError).description).toBe(`No ${resource} exists with ID 987.`);
 			expect(httpRequest).toHaveBeenCalledTimes(2);
 			expect(httpRequest.mock.calls[1][1]).toMatchObject({
 				method: 'GET',
@@ -147,9 +145,7 @@ describe('StudioCMS transport', () => {
 	);
 
 	it('preserves invalid-token mapping when the missing-tag authentication probe also fails', async () => {
-		const httpRequest = vi
-			.fn()
-			.mockRejectedValue({ response: { status: 500, data: '' } });
+		const httpRequest = vi.fn().mockRejectedValue({ response: { status: 500, data: '' } });
 		const context = createExecuteContext({ httpRequest });
 
 		const error = await studioCmsObjectRequest
@@ -327,7 +323,9 @@ describe('StudioCMS transport', () => {
 			.catch((caught: unknown) => caught);
 
 		expect(error).toBeInstanceOf(NodeOperationError);
-		expect(error).toMatchObject({ message: 'StudioCMS Site URL must be a valid HTTP or HTTPS URL' });
+		expect(error).toMatchObject({
+			message: 'StudioCMS Site URL must be a valid HTTP or HTTPS URL',
+		});
 		expect((error as NodeOperationError).context.itemIndex).toBe(5);
 	});
 });
