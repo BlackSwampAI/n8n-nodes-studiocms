@@ -27,6 +27,7 @@ const readme = read('README.md');
 const nodeMetadata = JSON.parse(read('nodes/StudioCms/StudioCms.node.json'));
 const credentialSource = read('credentials/StudioCmsApi.credentials.ts');
 const changelog = read('CHANGELOG.md');
+const npmConfig = read('.npmrc');
 let templateMarker;
 try {
 	templateMarker = JSON.parse(read('.blackswamp/template.json'));
@@ -73,6 +74,9 @@ if (packageJson.n8n?.credentials?.length !== 1)
 if (packageJson.publishConfig?.access !== 'public') fail('publishConfig.access must be public');
 if (packageJson.engines?.node !== '>=22.22.0') fail('engines.node must match >=22.22.0');
 if (packageJson.packageManager !== 'npm@11.19.0') fail('packageManager must pin npm@11.19.0');
+if (/^\s*engine-strict\s*=\s*true\s*$/im.test(npmConfig)) {
+	fail('engine-strict must remain disabled so the Node 22 CI lane can install dev-only tooling');
+}
 if (packageJson.scripts?.release !== 'n8n-node release') fail('release must use n8n-node release');
 if (packageJson.scripts?.prepublishOnly !== 'n8n-node prerelease') {
 	fail('prepublishOnly must use the n8n-node prerelease guard');

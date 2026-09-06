@@ -1,9 +1,16 @@
+/* eslint-disable @n8n/community-nodes/no-restricted-imports -- scaffold config assertion */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import manifest from '../package.json';
 import tsconfig from '../tsconfig.json';
 
 describe('project scaffold', () => {
+	it('keeps engine-strict disabled for the dual-version CI development tree', () => {
+		const npmConfig = readFileSync('.npmrc', 'utf8');
+		expect(npmConfig).not.toMatch(/^\s*engine-strict\s*=\s*true\s*$/im);
+		expect(npmConfig).toMatch(/^package-lock=true$/m);
+	});
 	it('publishes the expected package identity and node registration', () => {
 		expect(manifest).toMatchObject({
 			name: '@blackswampai/n8n-nodes-studiocms',
