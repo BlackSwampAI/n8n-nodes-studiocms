@@ -82,8 +82,7 @@ export class StudioCms implements INodeType {
 						name: 'Check',
 						value: 'check',
 						action: 'Check the connection',
-						description:
-							'Confirm that the StudioCMS site, REST API, and API token are available',
+						description: 'Confirm that the StudioCMS site, REST API, and API token are available',
 					},
 				],
 				default: 'check',

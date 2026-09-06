@@ -1,6 +1,7 @@
 {
 	"name": "@blackswampai/n8n-nodes-studiocms",
-	"version": "0.1.1",
+	"version": "0.1.2",
+	"packageManager": "npm@11.19.0",
 	"description": "n8n community node for the StudioCMS REST API",
 	"license": "MIT",
 	"homepage": "https://blackswampai.com/n8n-nodes/studiocms/",
@@ -10,8 +11,8 @@
 		"studiocms"
 	],
 	"author": {
-		"name": "BlackSwamp AI",
-		"email": "root@chris.guru"
+		"name": "Christopher J. Nelson",
+		"email": "christopherjnelson@proton.me"
 	},
 	"repository": {
 		"type": "git",
@@ -27,11 +28,20 @@
 		"build": "n8n-node build",
 		"build:watch": "tsc --watch",
 		"dev": "n8n-node dev",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
 		"lint": "n8n-node lint",
 		"lint:fix": "n8n-node lint --fix",
+		"typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
 		"release:check": "node scripts/release-check.mjs",
 		"test": "vitest run",
+		"test:unit": "vitest run",
 		"test:watch": "vitest",
+		"scan:source": "node scripts/scan-source.mjs",
+		"scan:published": "node scripts/scan-published.mjs",
+		"package:check": "node scripts/package-check.mjs",
+		"smoke:load": "node scripts/node-load-smoke.mjs",
+		"smoke:install": "node scripts/packed-install-smoke.mjs",
 		"release": "n8n-node release",
 		"prepublishOnly": "n8n-node prerelease"
 	},
@@ -53,12 +63,16 @@
 		]
 	},
 	"devDependencies": {
-		"@n8n/node-cli": "0.43.2",
+		"@n8n/node-cli": "0.46.4",
+		"@n8n/scan-community-package": "0.34.0",
 		"@types/node": "^22.0.0",
 		"eslint": "9.39.4",
 		"prettier": "3.8.3",
 		"typescript": "5.9.3",
-		"vitest": "4.1.10"
+		"vitest": "4.1.11"
+	},
+	"allowScripts": {
+		"eslint-plugin-n8n-nodes-base": false
 	},
 	"peerDependencies": {
 		"n8n-workflow": "*"

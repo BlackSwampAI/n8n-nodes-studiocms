@@ -25,8 +25,7 @@ export class StudioCmsApi implements ICredentialType {
 			default: '',
 			placeholder: 'https://cms.example.com',
 			required: true,
-			description:
-				'The public URL of the StudioCMS site. A trailing slash is optional.',
+			description: 'The public URL of the StudioCMS site. A trailing slash is optional.',
 		},
 		{
 			displayName: 'API Token',
@@ -35,8 +34,7 @@ export class StudioCmsApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			required: true,
-			description:
-				'An API token created from the API Tokens section of the StudioCMS user profile',
+			description: 'An API token created from the API Tokens section of the StudioCMS user profile',
 		},
 	];
 

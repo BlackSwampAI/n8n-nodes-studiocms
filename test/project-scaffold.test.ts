@@ -1,9 +1,16 @@
+/* eslint-disable @n8n/community-nodes/no-restricted-imports -- scaffold config assertion */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import manifest from '../package.json';
 import tsconfig from '../tsconfig.json';
 
 describe('project scaffold', () => {
+	it('keeps engine-strict disabled for the dual-version CI development tree', () => {
+		const npmConfig = readFileSync('.npmrc', 'utf8');
+		expect(npmConfig).not.toMatch(/^\s*engine-strict\s*=\s*true\s*$/im);
+		expect(npmConfig).toMatch(/^package-lock=true$/m);
+	});
 	it('publishes the expected package identity and node registration', () => {
 		expect(manifest).toMatchObject({
 			name: '@blackswampai/n8n-nodes-studiocms',
@@ -13,8 +20,8 @@ describe('project scaffold', () => {
 			version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
 			license: 'MIT',
 			author: {
-				name: 'BlackSwamp AI',
-				email: 'root@chris.guru',
+				name: 'Christopher J. Nelson',
+				email: 'christopherjnelson@proton.me',
 			},
 			repository: {
 				type: 'git',
@@ -37,8 +44,9 @@ describe('project scaffold', () => {
 				nodes: ['dist/nodes/StudioCms/StudioCms.node.js'],
 			},
 			devDependencies: {
-				'@n8n/node-cli': '0.43.2',
-				vitest: '4.1.10',
+				'@n8n/node-cli': '0.46.4',
+				'@n8n/scan-community-package': '0.34.0',
+				vitest: '4.1.11',
 			},
 			peerDependencies: {
 				'n8n-workflow': '*',

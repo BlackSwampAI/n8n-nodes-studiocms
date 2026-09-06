@@ -190,9 +190,7 @@ describe('Tag operations', () => {
 		const getManyContext = createExecuteContext({
 			httpRequest: getManyRequest,
 			siteUrls: ['https://cache.example.com'],
-			parameters: [
-				tagParameters('getMany', { filters: {}, returnAll: true }),
-			],
+			parameters: [tagParameters('getMany', { filters: {}, returnAll: true })],
 		});
 
 		const [output] = await execute(getManyContext);
@@ -225,10 +223,7 @@ describe('Tag operations', () => {
 		const context = createExecuteContext({
 			httpRequest,
 			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
-			parameters: [
-				tagParameters('get', { tagId: 123 }),
-				tagParameters('get', { tagId: 456 }),
-			],
+			parameters: [tagParameters('get', { tagId: 123 }), tagParameters('get', { tagId: 456 })],
 		});
 
 		const [output] = await execute(context);
@@ -331,10 +326,7 @@ describe('Tag operations', () => {
 			continueOnFail: true,
 			httpRequest,
 			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
-			parameters: [
-				tagParameters('get', { tagId: 123 }),
-				tagParameters('get', { tagId: 456 }),
-			],
+			parameters: [tagParameters('get', { tagId: 123 }), tagParameters('get', { tagId: 456 })],
 		});
 
 		const [output] = await execute(context);
@@ -354,10 +346,7 @@ describe('Tag operations', () => {
 		const context = createExecuteContext({
 			httpRequest,
 			inputItems: [{ json: { input: 1 } }, { json: { input: 2 } }],
-			parameters: [
-				tagParameters('get', { tagId: 123 }),
-				tagParameters('get', { tagId: 456 }),
-			],
+			parameters: [tagParameters('get', { tagId: 123 }), tagParameters('get', { tagId: 456 })],
 		});
 
 		const error = await execute(context).catch((caught: unknown) => caught);
