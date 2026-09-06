@@ -104,10 +104,19 @@ for (const command of [
 	'npm run package:check',
 	'npm run smoke:load',
 	'npm run smoke:install',
-	'npm run scan:published',
 ])
 	if (!publishWorkflow.includes(command)) fail(`publish workflow is missing ${command}`);
 if (!publishWorkflow.includes('timeout-minutes: 30')) fail('publish job needs a 30-minute timeout');
+const [publishJob, verifyPublishedJob = ''] = publishWorkflow.split(/\n  verify-published:\s*\n/);
+if (
+	!/needs:\s*publish/.test(verifyPublishedJob) ||
+	!verifyPublishedJob.includes('npm run scan:published')
+)
+	fail('verify-published must depend on publish and run the published scanner');
+if (publishJob.includes('npm run scan:published') || verifyPublishedJob.includes('npm run release'))
+	fail('publication and published-package verification must remain separate jobs');
+if (/id-token:\s*write/.test(verifyPublishedJob))
+	fail('verify-published must not receive id-token: write');
 
 if (
 	process.env.GITHUB_REF_TYPE === 'tag' &&
