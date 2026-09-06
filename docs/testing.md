@@ -7,6 +7,10 @@ The release ladder is: format, n8n lint, production plus test typecheck, Vitest,
 source/built scanner preflight, dry-run package allowlist, compiled node/credential load, and an
 isolated packed install. Registry provenance scanning occurs only after publication.
 
+The registry scanner retries only narrowly recognized propagation failures. This includes the
+short-lived 404 that can occur while npm provenance is already available but its newly attested
+GitHub source is not yet fetchable by the scanner; policy and lint failures still fail immediately.
+
 Live StudioCMS testing requires an explicitly disposable site, run-scoped fixtures, exact cleanup,
 and absence verification. No live credentials belong in the repository. A representative actual
 n8n editor smoke should verify the credential UI, visible/required controls, execution, and both
