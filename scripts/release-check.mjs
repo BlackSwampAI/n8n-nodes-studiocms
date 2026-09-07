@@ -161,14 +161,16 @@ for (const path of [
 
 const expectedIconHashes = {
 	'nodes/StudioCms/studioCms.svg':
-		'5276da8af87725a949a580e824a9ce771de68c4a4560a1e81938687b9db49af6',
+		'cd64401241cb17d12aa34ed042ec609bf586f80fe07ce1b6e4b8fd90893ef201',
 	'nodes/StudioCms/studioCms.dark.svg':
-		'e3931df40a46753f93cbcd6197f7e972dde2c322920cc95c40730412333aa5fc',
+		'0262581346822dde3c93fd6e62332afe53967c2b5e9afc424b751d19e302da31',
 };
 for (const [path, expectedHash] of Object.entries(expectedIconHashes)) {
-	const hash = createHash('sha256')
-		.update(readFileSync(resolve(root, path)))
-		.digest('hex');
+	const icon = read(path);
+	if (!/^<svg\b[^]*<\/svg>\n?$/.test(icon)) {
+		fail(`StudioCMS icon must contain only SVG markup: ${path}`);
+	}
+	const hash = createHash('sha256').update(icon).digest('hex');
 	if (hash !== expectedHash) fail(`StudioCMS icon hash changed: ${path}`);
 }
 

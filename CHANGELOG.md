@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.1.3 - 2026-09-07
+
+### Fixed
+
+- Removed leading shell error output from both StudioCMS SVG icons so Creator Portal consumers
+  receive valid SVG markup.
+
 ## 0.1.2 - 2026-09-06
 
 ### Changed
