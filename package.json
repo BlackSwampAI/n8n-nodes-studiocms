@@ -1,6 +1,6 @@
 {
 	"name": "@blackswampai/n8n-nodes-studiocms",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"packageManager": "npm@11.19.0",
 	"description": "n8n community node for the StudioCMS REST API",
 	"license": "MIT",

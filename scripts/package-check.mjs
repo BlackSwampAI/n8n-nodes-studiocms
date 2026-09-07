@@ -30,18 +30,20 @@ if (missing.length || unexpected.length)
 	);
 const hashes = {
 	'nodes/StudioCms/studioCms.svg':
-		'5276da8af87725a949a580e824a9ce771de68c4a4560a1e81938687b9db49af6',
+		'cd64401241cb17d12aa34ed042ec609bf586f80fe07ce1b6e4b8fd90893ef201',
 	'nodes/StudioCms/studioCms.dark.svg':
-		'e3931df40a46753f93cbcd6197f7e972dde2c322920cc95c40730412333aa5fc',
+		'0262581346822dde3c93fd6e62332afe53967c2b5e9afc424b751d19e302da31',
 	'dist/nodes/StudioCms/studioCms.svg':
-		'5276da8af87725a949a580e824a9ce771de68c4a4560a1e81938687b9db49af6',
+		'cd64401241cb17d12aa34ed042ec609bf586f80fe07ce1b6e4b8fd90893ef201',
 	'dist/nodes/StudioCms/studioCms.dark.svg':
-		'e3931df40a46753f93cbcd6197f7e972dde2c322920cc95c40730412333aa5fc',
+		'0262581346822dde3c93fd6e62332afe53967c2b5e9afc424b751d19e302da31',
 };
 for (const [path, expected] of Object.entries(hashes)) {
-	const actual = createHash('sha256')
-		.update(readFileSync(resolve(root, path)))
-		.digest('hex');
+	const icon = readFileSync(resolve(root, path), 'utf8');
+	if (!/^<svg\b[^]*<\/svg>\n?$/.test(icon)) {
+		throw new Error(`StudioCMS icon must contain only SVG markup: ${path}`);
+	}
+	const actual = createHash('sha256').update(icon).digest('hex');
 	if (actual !== expected) throw new Error(`Official StudioCMS icon hash changed: ${path}`);
 }
 console.log(`Package boundary passed (${files.length} intended files, ${pack.size} bytes packed)`);
