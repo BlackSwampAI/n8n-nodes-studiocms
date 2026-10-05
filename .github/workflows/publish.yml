@@ -12,6 +12,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify immutable release tag
+        run: node scripts/verify-release-tag.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -24,6 +28,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run review:source
       - run: npm run build
       - run: npm run scan:source
       - run: npm run release:check
@@ -48,3 +53,21 @@ jobs:
       - run: npm install --global npm@11.19.0
       - run: npm ci
       - run: npm run scan:published
+
+  notify-discord:
+    needs: [publish, verify-published]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Notify Discord when configured
+        continue-on-error: true
+        run: node scripts/notify-discord.mjs
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}

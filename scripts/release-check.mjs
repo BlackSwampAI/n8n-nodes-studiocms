@@ -23,11 +23,15 @@ function hasPlaceholder(value) {
 const packageJson = JSON.parse(read('package.json'));
 const packageLock = JSON.parse(read('package-lock.json'));
 const publishWorkflow = read('.github/workflows/publish.yml');
+const ciWorkflow = read('.github/workflows/ci.yml');
 const readme = read('README.md');
 const nodeMetadata = JSON.parse(read('nodes/StudioCms/StudioCms.node.json'));
 const credentialSource = read('credentials/StudioCmsApi.credentials.ts');
 const changelog = read('CHANGELOG.md');
 const npmConfig = read('.npmrc');
+const sourceReview = read('scripts/review-node-source.mjs');
+const releaseTagGuard = read('scripts/verify-release-tag.mjs');
+const publishedScan = read('scripts/scan-published.mjs');
 let templateMarker;
 try {
 	templateMarker = JSON.parse(read('.blackswamp/template.json'));
@@ -74,6 +78,30 @@ if (packageJson.n8n?.credentials?.length !== 1)
 if (packageJson.publishConfig?.access !== 'public') fail('publishConfig.access must be public');
 if (packageJson.engines?.node !== '>=22.22.0') fail('engines.node must match >=22.22.0');
 if (packageJson.packageManager !== 'npm@11.19.0') fail('packageManager must pin npm@11.19.0');
+for (const [name, version] of [
+	['@n8n/scan-community-package', '0.38.0'],
+	['release-it', '20.2.0'],
+	['typescript', '5.9.3'],
+]) {
+	if (packageJson.devDependencies?.[name] !== version)
+		fail(`devDependency ${name} must be pinned to ${version}`);
+	if (packageLock.packages?.['']?.devDependencies?.[name] !== version)
+		fail(`package-lock root must pin ${name}@${version}`);
+}
+if (packageLock.packages?.['node_modules/@n8n/scan-community-package']?.version !== '0.38.0')
+	fail('package-lock must resolve the official scanner to 0.38.0');
+if (
+	packageLock.packages?.['node_modules/@n8n/scan-community-package/node_modules/typescript']
+		?.version !== '6.0.2'
+)
+	fail('scanner TypeScript 6 alias must remain nested; project TypeScript stays 5.9.3');
+if (
+	packageLock.packages?.['node_modules/@n8n/scan-community-package/node_modules/@typescript/old']
+		?.version !== '6.0.3'
+)
+	fail('scanner TypeScript 6 command alias must stay nested and not shadow the project compiler');
+if (packageLock.packages?.['node_modules/@typescript/old'])
+	fail('scanner TypeScript 6 command alias must not be hoisted over the project tsc bin');
 if (/^\s*engine-strict\s*=\s*true\s*$/im.test(npmConfig)) {
 	fail('engine-strict must remain disabled so the Node 22 CI lane can install dev-only tooling');
 }
@@ -81,6 +109,25 @@ if (packageJson.scripts?.release !== 'n8n-node release') fail('release must use 
 if (packageJson.scripts?.prepublishOnly !== 'n8n-node prerelease') {
 	fail('prepublishOnly must use the n8n-node prerelease guard');
 }
+if (packageJson.scripts?.['review:source'] !== 'node scripts/review-node-source.mjs')
+	fail('review:source must invoke the source placeholder guard');
+if (
+	packageJson.scripts?.typecheck !==
+	'node node_modules/typescript/bin/tsc --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.test.json --noEmit'
+)
+	fail('typecheck must invoke the project-local TypeScript 5.9.3 compiler directly');
+if (packageJson.scripts?.dev !== 'node scripts/dev.mjs')
+	fail('dev must use the isolated port and workspace user-folder launcher');
+if (!sourceReview.includes('exports only empty INodeProperties arrays'))
+	fail('source review must preserve the typed empty-operation placeholder guard');
+if (!releaseTagGuard.includes("taggedCommit !== runGit(repository, ['rev-parse', 'HEAD'])"))
+	fail('release tag guard must bind the annotated version tag to checked-out HEAD');
+if (
+	!publishedScan.includes('INITIAL_SETTLING_DELAY_MS = 60_000') ||
+	!publishedScan.includes('RETRY_DELAY_MS = 30_000') ||
+	!publishedScan.includes('MAX_ATTEMPTS = 11')
+)
+	fail('published scan must use the bounded 60s + eleven-attempt/30s retry policy');
 
 if (nodeMetadata.node !== `${expectedPackageName}.studioCms`) {
 	fail('StudioCMS codex metadata must use the fully qualified scoped node type');
@@ -100,6 +147,7 @@ if (!publishWorkflow.includes('npm run release')) fail('publish workflow must ru
 if (publishWorkflow.includes('secrets.NPM_TOKEN'))
 	fail('established package must publish with tokenless OIDC');
 for (const command of [
+	'npm run review:source',
 	'npm run scan:source',
 	'npm run package:check',
 	'npm run smoke:load',
@@ -108,6 +156,27 @@ for (const command of [
 	if (!publishWorkflow.includes(command)) fail(`publish workflow is missing ${command}`);
 if (!publishWorkflow.includes('timeout-minutes: 30')) fail('publish job needs a 30-minute timeout');
 const [publishJob, verifyPublishedJob = ''] = publishWorkflow.split(/\n  verify-published:\s*\n/);
+if (!/fetch-depth:\s*0/.test(publishJob))
+	fail('publish checkout must fetch complete tag/main history');
+if (!publishJob.includes('node scripts/verify-release-tag.mjs'))
+	fail('publish job must verify the immutable tag before setup/auth/publication');
+if (
+	publishJob.indexOf('node scripts/verify-release-tag.mjs') >
+	publishJob.indexOf('actions/setup-node@')
+)
+	fail('release tag verification must run immediately after checkout and before Node setup');
+if (publishJob.indexOf('npm run review:source') > publishJob.indexOf('npm run build'))
+	fail('publish job must review TypeScript source before build');
+if (!ciWorkflow.includes('workflow_dispatch:')) fail('CI must allow safe manual workflow_dispatch');
+if (ciWorkflow.indexOf('npm run review:source') > ciWorkflow.indexOf('npm run build'))
+	fail('CI must review TypeScript source before build');
+if (!publishWorkflow.includes('needs: [publish, verify-published]'))
+	fail('Discord notification must depend on publication and published verification');
+if (
+	!publishWorkflow.includes('continue-on-error: true') ||
+	!publishWorkflow.includes('DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}')
+)
+	fail('Discord notification must be optional and pass its webhook only to the notifier step');
 if (
 	!/needs:\s*publish/.test(verifyPublishedJob) ||
 	!verifyPublishedJob.includes('npm run scan:published')
@@ -128,7 +197,8 @@ if (!new RegExp(`^## ${packageJson.version}(?: |$)`, 'm').test(changelog))
 
 if (
 	templateMarker?.schemaVersion !== 1 ||
-	templateMarker?.templateVersion !== '2.0.0' ||
+	templateMarker?.templateVersion !== '2.2.0' ||
+	templateMarker?.sourceCommit !== '596e784cfe69cd8894529b8a81c491921cde9773' ||
 	templateMarker?.sourceRepository !==
 		'https://github.com/christopherjnelson/n8n-community-node-template'
 )
@@ -139,6 +209,8 @@ for (const heading of [
 	'## Compatibility',
 	'## Credentials',
 	'## Operations',
+	'## Troubleshooting',
+	'## Resources',
 	'## License',
 ]) {
 	if (!readme.includes(heading)) fail(`README is missing ${heading}`);
@@ -154,10 +226,23 @@ for (const path of [
 	'docs/branding.md',
 	'docs/BATCH_HANDOFF_TEMPLATE.md',
 	'docs/TEMPLATE_MIGRATIONS.md',
+	'docs/live-smoke-2026-10-05.md',
 	'.github/pull_request_template.md',
 ]) {
 	if (!existsSync(resolve(root, path))) fail(`${path} is required`);
 }
+const matrixRows =
+	read('docs/api-matrix.md').match(/^\| (?:Connection|Category|Folder|Page|Tag)\s+\|/gm) ?? [];
+if (matrixRows.length !== 21)
+	fail(
+		`API matrix must contain one row for every advertised operation (found ${matrixRows.length})`,
+	);
+if (
+	!read('docs/TEMPLATE_MIGRATIONS.md').includes(
+		"Declarative-style conversion was deferred at the user's direction",
+	)
+)
+	fail('template migration log must record the user-directed declarative-style deferment');
 
 const expectedIconHashes = {
 	'nodes/StudioCms/studioCms.svg':

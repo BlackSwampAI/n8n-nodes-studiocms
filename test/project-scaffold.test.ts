@@ -32,9 +32,13 @@ describe('project scaffold', () => {
 				build: 'n8n-node build',
 				lint: 'n8n-node lint',
 				test: 'vitest run',
+				typecheck:
+					'node node_modules/typescript/bin/tsc --noEmit && node node_modules/typescript/bin/tsc -p tsconfig.test.json --noEmit',
+				dev: 'node scripts/dev.mjs',
 				release: 'n8n-node release',
 				prepublishOnly: 'n8n-node prerelease',
 				'release:check': 'node scripts/release-check.mjs',
+				'review:source': 'node scripts/review-node-source.mjs',
 			},
 			publishConfig: { access: 'public' },
 			n8n: {
@@ -45,7 +49,8 @@ describe('project scaffold', () => {
 			},
 			devDependencies: {
 				'@n8n/node-cli': '0.46.4',
-				'@n8n/scan-community-package': '0.34.0',
+				'@n8n/scan-community-package': '0.38.0',
+				'release-it': '20.2.0',
 				vitest: '4.1.11',
 			},
 			peerDependencies: {

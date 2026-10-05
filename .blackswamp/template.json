@@ -1,5 +1,6 @@
 {
 	"schemaVersion": 1,
-	"templateVersion": "2.0.0",
-	"sourceRepository": "https://github.com/christopherjnelson/n8n-community-node-template"
+	"templateVersion": "2.2.0",
+	"sourceRepository": "https://github.com/christopherjnelson/n8n-community-node-template",
+	"sourceCommit": "596e784cfe69cd8894529b8a81c491921cde9773"
 }
