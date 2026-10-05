@@ -48,6 +48,30 @@ describe('release hardening', () => {
 			),
 		).toBe(false);
 		expect(
+			isLikelyPropagationFailure(
+				'Reason: unrelated registry request returned status code 404',
+				spec,
+			),
+		).toBe(false);
+		expect(
+			isLikelyPropagationFailure(
+				"Reason: Could not fetch the source repository recorded in the package's npm provenance (Request failed with status code 404). An unrelated explanation",
+				spec,
+			),
+		).toBe(false);
+		expect(
+			isDeterministicSecurityFailure(
+				`Reason: Could not fetch the source repository recorded in the package's npm provenance (Request failed with status code 404)\nReason: ESLint violations found`,
+				spec,
+			),
+		).toBe(true);
+		expect(
+			isLikelyPropagationFailure(
+				"Reason: Could not fetch the source repository recorded in the package's npm provenance (Request failed with status code 403).",
+				spec,
+			),
+		).toBe(false);
+		expect(
 			isDeterministicSecurityFailure(
 				`Package ${spec} has failed security checks\nESLint violations found`,
 				spec,

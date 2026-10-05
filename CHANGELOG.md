@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Fixed
+
+- Accept legacy and reduced embedded-user shapes in StudioCMS Page responses while retaining
+  identity validation and sensitive-field exclusion.
+
+### Changed
+
+- Migrated reviewed release, scanner, source-review, package-smoke, and workspace-dev safeguards
+  to n8n community-node template 2.2.0; see [template migration notes](docs/TEMPLATE_MIGRATIONS.md).
+
 ## 0.1.3 - 2026-09-07
 
 ### Fixed

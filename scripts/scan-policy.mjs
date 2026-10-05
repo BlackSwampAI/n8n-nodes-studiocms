@@ -4,7 +4,7 @@ export function isLikelyPropagationFailure(output, packageSpec) {
 	return (
 		(missingMetadata !== null && missingMetadata[1] === expectedVersion) ||
 		/^Reason: Analysis failed: Request failed with status code 404\s*$/m.test(output) ||
-		/^Reason: Could not fetch the source repository recorded in the package's npm provenance \(Request failed with status code 404\)\.[^\n]*$/m.test(
+		/^Reason: Could not fetch the source repository recorded in the package's npm provenance \(Request failed with status code 404\)(?:\. The scan lints the attested source, so it must be reachable)?\s*$/m.test(
 			output,
 		)
 	);

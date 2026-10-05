@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { StudioCms } from '../nodes/StudioCms/StudioCms.node';
 import { createExecuteContext } from './helpers';
+import legacyPageUser from './fixtures/page-user-0.4.4.json';
+import reducedPageUser from './fixtures/page-user-0.6.1.json';
 
 const pageId = '915c3ed9-78f5-46cf-8f94-b34b3f95dd34';
 const folderId = '4f4fe7ce-bd70-43ec-9de9-957fdfd25d5c';
@@ -70,6 +72,10 @@ const page = {
 	contributorsData: [{ ...author, id: 'contributor-id', emailVerified: 0 }],
 };
 
+const legacyUserWithoutNotifications = Object.fromEntries(
+	Object.entries(legacyPageUser).filter(([key]) => key !== 'notifications'),
+);
+
 async function execute(context: ReturnType<typeof createExecuteContext>) {
 	return await new StudioCms().execute.call(context);
 }
@@ -120,7 +126,187 @@ const updateValues = {
 	},
 };
 
+function wirePage(authorData: unknown, contributorsData: unknown[] = []): typeof page {
+	return JSON.parse(JSON.stringify({ ...page, authorData, contributorsData })) as typeof page;
+}
+
 describe('Page operations', () => {
+	it.each([
+		['legacy full user', legacyPageUser],
+		['legacy full user with optional notifications omitted', legacyUserWithoutNotifications],
+		['reduced user', reducedPageUser],
+	])(
+		'accepts a JSON wire Page response with a %s as author and contributor',
+		async (_label, user) => {
+			for (const operation of ['get', 'getMany']) {
+				const response = wirePage(user, [{ ...user, id: 'contributor-id' }]);
+				const wireResponse = operation === 'getMany' ? [response] : response;
+				const httpRequest = vi.fn().mockResolvedValue(wireResponse);
+				const context = createExecuteContext({
+					httpRequest,
+					parameters: [
+						pageParameters(
+							operation,
+							operation === 'get' ? { pageId } : { filters: {}, returnAll: true },
+						),
+					],
+				});
+
+				const [output] = await execute(context);
+
+				expect(output).toHaveLength(1);
+				expect(output[0].json).toEqual(response);
+			}
+		},
+	);
+
+	it('accepts author-only and contributor-only page users, including absent/null/empty identity optionals', async () => {
+		const authorOnly = { ...reducedPageUser, url: undefined, avatar: null };
+		const contributorOnly = {
+			...reducedPageUser,
+			id: 'contributor-id',
+			url: '',
+			avatar: undefined,
+		};
+		const requests = [
+			{ operation: 'get', response: wirePage(authorOnly, []) },
+			{ operation: 'getMany', response: [wirePage(undefined, [contributorOnly])] },
+			{ operation: 'get', response: wirePage(undefined, []) },
+		];
+		for (const { operation, response } of requests) {
+			const context = createExecuteContext({
+				httpRequest: vi.fn().mockResolvedValue(response),
+				parameters: [
+					pageParameters(
+						operation,
+						operation === 'get' ? { pageId } : { filters: {}, returnAll: true },
+					),
+				],
+			});
+			await expect(execute(context)).resolves.toBeDefined();
+		}
+	});
+
+	it.each(['update', 'delete'])(
+		'accepts the reduced JSON page response during %s preflight and sends the mutation',
+		async (operation) => {
+			const response = {
+				message: `Page ${operation === 'update' ? 'updated' : 'deleted'} successfully`,
+			};
+			const httpRequest = vi
+				.fn()
+				.mockResolvedValueOnce(
+					wirePage(reducedPageUser, [{ ...reducedPageUser, id: 'contributor-id' }]),
+				)
+				.mockResolvedValueOnce(response);
+			const context = createExecuteContext({
+				httpRequest,
+				parameters: [
+					pageParameters(
+						operation,
+						operation === 'update' ? { pageId, updateFields: { title: 'Changed' } } : { pageId },
+					),
+				],
+			});
+
+			const [output] = await execute(context);
+
+			expect(output).toEqual([{ json: response, pairedItem: { item: 0 } }]);
+			expect(httpRequest).toHaveBeenCalledTimes(2);
+			expect(httpRequest.mock.calls[1][1].method).toBe(operation === 'update' ? 'PATCH' : 'DELETE');
+		},
+	);
+
+	it.each([
+		['missing id', { name: 'Editor', username: 'editor' }],
+		['missing name', { id: reducedPageUser.id, username: 'editor' }],
+		['missing username', { id: reducedPageUser.id, name: 'Editor' }],
+		['wrong id type', { ...reducedPageUser, id: 12 }],
+		['wrong name type', { ...reducedPageUser, name: 12 }],
+		['wrong username type', { ...reducedPageUser, username: 12 }],
+		['wrong optional type', { ...reducedPageUser, avatar: 12 }],
+		['wrong url type', { ...reducedPageUser, url: 12 }],
+		['partial legacy tail', { ...reducedPageUser, updatedAt: '2026-08-11T20:00:00.000Z' }],
+		['legacy invalid timestamp', { ...legacyPageUser, updatedAt: 'yesterday' }],
+		['legacy invalid boolean type', { ...legacyPageUser, emailVerified: 'true' }],
+		['legacy invalid notifications type', { ...legacyPageUser, notifications: 10 }],
+		['notifications without required legacy fields', { ...reducedPageUser, notifications: null }],
+		['invalid legacy tail', { ...reducedPageUser, createdAt: 'yesterday' }],
+		[
+			'null legacy boolean',
+			{
+				...reducedPageUser,
+				updatedAt: '2026-08-11T20:00:00.000Z',
+				createdAt: '2026-01-02T03:04:05.000Z',
+				emailVerified: null,
+				notifications: null,
+			},
+		],
+		['invalid optional legacy field', { ...reducedPageUser, notifications: 10 }],
+		['sensitive email', { ...reducedPageUser, email: 'secret@example.com' }],
+		['null sensitive email', { ...reducedPageUser, email: null }],
+		['sensitive password', { ...reducedPageUser, password: 'secret' }],
+		['null sensitive password', { ...reducedPageUser, password: null }],
+	])('rejects %s in page embedded users and blocks mutation preflight', async (_label, user) => {
+		for (const operation of ['get', 'getMany', 'update', 'delete']) {
+			for (const invalidSlot of ['authorData', 'contributorsData']) {
+				const invalid =
+					invalidSlot === 'authorData'
+						? wirePage(user, [{ ...reducedPageUser, id: 'contributor-id' }])
+						: wirePage(reducedPageUser, [user]);
+				const httpRequest = vi
+					.fn()
+					.mockResolvedValueOnce(operation === 'getMany' ? [invalid] : invalid);
+				const context = createExecuteContext({
+					httpRequest,
+					parameters: [
+						pageParameters(
+							operation,
+							operation === 'getMany'
+								? { filters: {}, returnAll: true }
+								: operation === 'update'
+									? { pageId, updateFields: { title: 'Changed' } }
+									: { pageId },
+						),
+					],
+				});
+				const error = await execute(context).catch((caught: unknown) => caught);
+				expect(error).toBeInstanceOf(NodeApiError);
+				expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
+				expect(httpRequest).toHaveBeenCalledTimes(1);
+			}
+		}
+	});
+
+	it.each([null, {}, ['not-a-contributor'], 42])(
+		'rejects malformed contributorsData %j independently of a valid author and blocks mutations',
+		async (contributorsData) => {
+			for (const operation of ['get', 'getMany', 'update', 'delete']) {
+				const invalid = wirePage(reducedPageUser, contributorsData as unknown[]);
+				const httpRequest = vi
+					.fn()
+					.mockResolvedValueOnce(operation === 'getMany' ? [invalid] : invalid);
+				const context = createExecuteContext({
+					httpRequest,
+					parameters: [
+						pageParameters(
+							operation,
+							operation === 'getMany'
+								? { filters: {}, returnAll: true }
+								: operation === 'update'
+									? { pageId, updateFields: { title: 'Changed' } }
+									: { pageId },
+						),
+					],
+				});
+				const error = await execute(context).catch((caught: unknown) => caught);
+				expect(error).toBeInstanceOf(NodeApiError);
+				expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
+				expect(httpRequest).toHaveBeenCalledTimes(1);
+			}
+		},
+	);
+
 	it('exposes complete Page CRUD and the official Page filters', () => {
 		const properties = new StudioCms().description.properties;
 		const resource = properties.find((property) => property.name === 'resource');
@@ -149,6 +335,7 @@ describe('Page operations', () => {
 			expect.objectContaining({ name: 'Page', value: 'page' }),
 			expect.objectContaining({ name: 'Tag', value: 'tag' }),
 		]);
+
 		expect(operation?.options).toEqual([
 			expect.objectContaining({ value: 'create' }),
 			expect.objectContaining({ value: 'delete' }),
@@ -188,6 +375,18 @@ describe('Page operations', () => {
 			expect.objectContaining({ name: 'slug', displayName: 'Slug' }),
 			expect.objectContaining({ name: 'title', displayName: 'Title' }),
 		]);
+	});
+
+	it('rejects null authorData because the released schema permits omission but not null', async () => {
+		const invalid = JSON.parse(JSON.stringify({ ...page, authorData: null }));
+		const httpRequest = vi.fn().mockResolvedValueOnce(invalid);
+		const context = createExecuteContext({
+			httpRequest,
+			parameters: [pageParameters('get', { pageId })],
+		});
+		const error = await execute(context).catch((caught: unknown) => caught);
+		expect(error).toBeInstanceOf(NodeApiError);
+		expect(error).toMatchObject({ message: 'StudioCMS returned a malformed response' });
 	});
 
 	it('creates a Page with every supported field and exact REST wire encodings', async () => {

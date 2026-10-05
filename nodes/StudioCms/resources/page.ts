@@ -479,20 +479,50 @@ function isPageContent(value: unknown): boolean {
 	);
 }
 
-function isSafeUser(value: unknown): boolean {
+type PageEmbeddedUserIdentity = {
+	id: string;
+	name: string;
+	username: string;
+	url?: string | null;
+	avatar?: string | null;
+};
+
+type ReducedPageEmbeddedUser = PageEmbeddedUserIdentity;
+
+type LegacyPageEmbeddedUser = PageEmbeddedUserIdentity & {
+	updatedAt: string;
+	createdAt: string;
+	emailVerified: 0 | 1;
+	notifications?: string | null;
+};
+
+type PageEmbeddedUser = ReducedPageEmbeddedUser | LegacyPageEmbeddedUser;
+
+function isPageEmbeddedUser(value: unknown): value is PageEmbeddedUser {
+	if (
+		!isRecord(value) ||
+		typeof value.id !== 'string' ||
+		!isOptionalString(value.url) ||
+		typeof value.name !== 'string' ||
+		!isOptionalString(value.avatar) ||
+		typeof value.username !== 'string' ||
+		value.email !== undefined ||
+		value.password !== undefined
+	) {
+		return false;
+	}
+
+	const legacyFields = ['updatedAt', 'createdAt', 'emailVerified', 'notifications'] as const;
+	const requiredLegacyFields = ['updatedAt', 'createdAt', 'emailVerified'] as const;
+	const hasLegacyFields = legacyFields.some((field) => field in value);
+	const presentRequiredLegacyFields = requiredLegacyFields.filter((field) => field in value);
+	if (!isOptionalString(value.notifications)) return false;
+	if (!hasLegacyFields) return true;
 	return (
-		isRecord(value) &&
-		typeof value.id === 'string' &&
-		isOptionalString(value.url) &&
-		typeof value.name === 'string' &&
-		isOptionalString(value.avatar) &&
-		typeof value.username === 'string' &&
+		presentRequiredLegacyFields.length === requiredLegacyFields.length &&
 		isDateString(value.updatedAt) &&
 		isDateString(value.createdAt) &&
-		isEncodedBoolean(value.emailVerified) &&
-		isOptionalString(value.notifications) &&
-		value.email === undefined &&
-		value.password === undefined
+		isEncodedBoolean(value.emailVerified)
 	);
 }
 
@@ -523,9 +553,9 @@ function isPage(value: JsonObject): boolean {
 		value.multiLangContent.every(isPageContent) &&
 		(value.defaultContent === undefined || isPageContent(value.defaultContent)) &&
 		typeof value.urlRoute === 'string' &&
-		(value.authorData === undefined || isSafeUser(value.authorData)) &&
+		(value.authorData === undefined || isPageEmbeddedUser(value.authorData)) &&
 		Array.isArray(value.contributorsData) &&
-		value.contributorsData.every(isSafeUser)
+		value.contributorsData.every(isPageEmbeddedUser)
 	);
 }
 

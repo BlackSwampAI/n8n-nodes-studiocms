@@ -1,2 +1,6 @@
+node_modules
+dist
+.codex-scratch/
+
 nodes/StudioCms/studioCms.svg
 nodes/StudioCms/studioCms.dark.svg

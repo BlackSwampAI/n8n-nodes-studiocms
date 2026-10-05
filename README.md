@@ -15,9 +15,11 @@ their respective owners and are used only to identify compatibility.
 
 ## Installation
 
-On the n8n canvas, open the nodes panel, search for **StudioCMS**, select it under **More from the
-community**, and choose **Install**. On self-hosted n8n, administrators may alternatively install
-the exact package name `@blackswampai/n8n-nodes-studiocms` through Community Nodes settings.
+On a self-hosted n8n instance, an Owner or Admin can open **Settings → Community Nodes → Install →
+Browse**, search for **StudioCMS**, and install `@blackswampai/n8n-nodes-studiocms`. The package is
+published to npm with the `n8n-community-node-package` keyword used by n8n's Browse flow. n8n's
+[GUI installation guide](https://docs.n8n.io/integrations/community-nodes/installation-and-management/gui-installation)
+describes that npm-backed listing.
 
 ## Compatibility
 
@@ -25,10 +27,12 @@ the exact package name `@blackswampai/n8n-nodes-studiocms` through Community Nod
 | --------- | ------------------------------------ |
 | Node.js   | 22.22.0 or newer                     |
 | n8n       | 2.34.4 or newer                      |
-| StudioCMS | 0.4.4 or newer with REST API enabled |
+| StudioCMS | 0.4.4 baseline with REST API enabled |
 
-The 0.1 line was developed against this baseline. Later compatible versions should work, but
-breaking upstream API changes may require an integration update.
+The node's original baseline is 0.4.4. Page embedded-user wire fixtures cover released 0.5.0;
+the compiled-node live smoke covers selected Page operations on 0.6.1 only
+([report](docs/live-smoke-2026-10-05.md)). This evidence does not establish general compatibility
+with later versions or n8n editor qualification.
 
 ## Credentials
 
